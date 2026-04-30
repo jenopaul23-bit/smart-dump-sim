@@ -78,14 +78,24 @@ export function Terrain({ gridRef, showHeatmap }: Props) {
   );
 }
 
-// Subtle grid overlay
+// Subtle grid overlay (manual lines so we can control opacity)
 export function GridOverlay() {
+  const geom = useMemo(() => {
+    const verts: number[] = [];
+    const half = SIZE / 2;
+    const step = SIZE / SEG;
+    for (let i = 0; i <= SEG; i++) {
+      const p = -half + i * step;
+      verts.push(p, 0.05, -half, p, 0.05, half);
+      verts.push(-half, 0.05, p, half, 0.05, p);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(verts, 3));
+    return g;
+  }, []);
   return (
-    <gridHelper
-      args={[SIZE, SEG, "#a06a20", "#5a3818"]}
-      position={[0, 0.05, 0]}
-    >
-      <meshBasicMaterial attach="material" transparent opacity={0.18} />
-    </gridHelper>
+    <lineSegments geometry={geom}>
+      <lineBasicMaterial color="#a06a20" transparent opacity={0.12} />
+    </lineSegments>
   );
 }
