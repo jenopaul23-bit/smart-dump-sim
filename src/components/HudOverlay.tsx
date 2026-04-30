@@ -1,6 +1,8 @@
 // HUD overlay: metrics panel + truck roster + live charts + heatmap toggle.
 import { useEffect, useRef } from "react";
 import type { Metrics, Truck, DumpEvent } from "@/sim/types";
+import type { Zone } from "@/sim/voronoi";
+import { REASSIGN_THRESHOLD } from "@/sim/voronoi";
 
 interface Props {
   metrics: Metrics;
@@ -8,11 +10,15 @@ interface Props {
   events: DumpEvent[];
   showHeatmap: boolean;
   onToggleHeatmap: () => void;
+  showZones: boolean;
+  onToggleZones: () => void;
+  zones: Zone[];
+  reassignments: { id: number; zoneId: number; t: number }[];
   followTruck: string | null;
   onFollowTruck: (id: string | null) => void;
 }
 
-export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatmap, followTruck, onFollowTruck }: Props) {
+export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatmap, showZones, onToggleZones, zones, reassignments, followTruck, onFollowTruck }: Props) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
       {/* Top bar */}
@@ -27,6 +33,14 @@ export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatm
           </span>
         </div>
         <div className="flex items-center gap-2 text-[10px]">
+          <button
+            onClick={onToggleZones}
+            className={`px-3 py-1.5 border tracking-widest transition ${
+              showZones ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            ZONES {showZones ? "ON" : "OFF"}
+          </button>
           <button
             onClick={onToggleHeatmap}
             className={`px-3 py-1.5 border tracking-widest transition ${
@@ -43,8 +57,9 @@ export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatm
 
       <div className="flex-1 flex justify-between p-4 gap-4 overflow-hidden">
         {/* Left: Metrics + Charts */}
-        <div className="pointer-events-auto flex flex-col gap-3 w-72">
+        <div className="pointer-events-auto flex flex-col gap-3 w-72 overflow-y-auto">
           <MetricsPanel metrics={metrics} />
+          <ZonesPanel zones={zones} reassignments={reassignments} />
           <ChartCard title="PACKING DENSITY" value={metrics.packingDensity} max={1} unit="%" series="density" tick={metrics.totalDumps} />
           <ChartCard title="THROUGHPUT (60s)" value={metrics.throughput} max={20} unit="dumps" series="throughput" tick={metrics.totalDumps} />
           <ChartCard title="AVG CYCLE TIME" value={metrics.avgCycleMs / 1000} max={60} unit="s" series="cycle" tick={metrics.totalDumps} />
@@ -214,6 +229,69 @@ function EventLog({ events }: { events: DumpEvent[] }) {
           </div>
         ))}
       </div>
+    </div>
+  );
+}
+
+function ZonesPanel({ zones, reassignments }: { zones: Zone[]; reassignments: { id: number; zoneId: number; t: number }[] }) {
+  const totalReassign = zones.reduce((s, z) => s + z.reassignments, 0);
+  return (
+    <div className="hud-panel p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] tracking-widest text-primary">// VORONOI ZONES</span>
+        <span className="text-[9px] text-muted-foreground tracking-widest">
+          REASSIGN: <span className="text-foreground tabular-nums">{totalReassign}</span>
+        </span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {zones.map((z) => {
+          const pct = z.utilization * 100;
+          const saturated = z.utilization >= REASSIGN_THRESHOLD;
+          return (
+            <div key={z.id}>
+              <div className="flex items-center justify-between text-[10px] mb-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: z.color, boxShadow: `0 0 6px ${z.color}` }}
+                  />
+                  <span className="font-bold tracking-widest">Z{z.id}</span>
+                  <span className="text-muted-foreground">→ {z.truckId ?? "—"}</span>
+                </div>
+                <span
+                  className="tabular-nums tracking-widest"
+                  style={{ color: saturated ? "#ff5050" : z.color }}
+                >
+                  {pct.toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-1 bg-secondary overflow-hidden relative">
+                <div
+                  className="h-full transition-all"
+                  style={{
+                    width: `${Math.min(100, pct)}%`,
+                    backgroundColor: z.color,
+                    boxShadow: saturated ? `0 0 8px ${z.color}` : "none",
+                  }}
+                />
+                {/* 85% threshold marker */}
+                <div
+                  className="absolute top-0 bottom-0 w-px bg-foreground/40"
+                  style={{ left: `${REASSIGN_THRESHOLD * 100}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {reassignments.length > 0 && (
+        <div className="mt-3 pt-2 border-t border-border text-[9px] text-muted-foreground tracking-widest">
+          LAST RELOCATION: Z{reassignments[reassignments.length - 1].zoneId}
+          <span className="text-primary ml-1">
+            {((performance.now() - reassignments[reassignments.length - 1].t) / 1000).toFixed(0)}s ago
+          </span>
+        </div>
+      )}
     </div>
   );
 }

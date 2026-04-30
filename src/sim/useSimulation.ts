@@ -9,6 +9,10 @@ import { astar } from "@/sim/pathfinding";
 import {
   pickDumpCell, reserveFootprint, clearExpiredReservations, applyDump,
 } from "@/sim/dumpEngine";
+import {
+  makeVoronoi, recomputeUtilization, reassignSaturatedZones, zoneForTruck,
+  type VoronoiState,
+} from "@/sim/voronoi";
 
 const TRUCK_COLORS = ["#f59e0b", "#fb923c", "#fbbf24", "#facc15", "#fdba74"];
 const ENTRY_POINTS: [number, number][] = [
@@ -49,6 +53,8 @@ export interface SimState {
   metrics: Metrics;
   events: DumpEvent[];
   tick: number;
+  voronoi: VoronoiState;
+  reassignments: { id: number; zoneId: number; t: number }[];
 }
 
 const TRUCK_SPEED_MPS = 6; // metres/sec
@@ -60,6 +66,11 @@ export function useSimulation(numTrucks = 5) {
   const eventIdRef = useRef(0);
   const cycleSamplesRef = useRef<number[]>([]);
   const dumpTimestampsRef = useRef<number[]>([]);
+  const voronoiRef = useRef<VoronoiState>(
+    makeVoronoi(numTrucks, trucksRef.current.map(t => t.id))
+  );
+  const reassignLogRef = useRef<{ id: number; zoneId: number; t: number }[]>([]);
+  const reassignIdRef = useRef(0);
 
   const [state, setState] = useState<SimState>(() => ({
     grid: gridRef.current,
@@ -67,6 +78,8 @@ export function useSimulation(numTrucks = 5) {
     events: [],
     tick: 0,
     metrics: { totalDumps: 0, avgHeight: 0, utilization: 0, activeTrucks: 0, packingDensity: 0, throughput: 0, avgCycleMs: 0 },
+    voronoi: voronoiRef.current,
+    reassignments: [],
   }));
 
   const lastTimeRef = useRef(performance.now());
@@ -89,6 +102,8 @@ export function useSimulation(numTrucks = 5) {
           events: eventsRef.current.slice(-12),
           tick: tickRef.current,
           metrics: computeMetrics(now),
+          voronoi: voronoiRef.current,
+          reassignments: reassignLogRef.current.slice(-8),
         });
       }
       raf = requestAnimationFrame(loop);
@@ -135,8 +150,13 @@ export function useSimulation(numTrucks = 5) {
     const [tgx, tgy] = worldToGrid(truck.position[0], truck.position[2]);
 
     if (truck.state === "IDLE") {
-      // Plan: pick a dump cell, route there
-      const target = pickDumpCell(grid, [tgx, tgy], now);
+      // Plan: pick a dump cell within this truck's Voronoi zone
+      const v = voronoiRef.current;
+      const zone = zoneForTruck(v, truck.id);
+      const hint = zone
+        ? { assign: v.assign, preferredZone: zone.id, seed: zone.seed }
+        : undefined;
+      const target = pickDumpCell(grid, [tgx, tgy], now, hint);
       if (!target) return;
       const path = astar(grid, [tgx, tgy], target);
       if (!path || path.length < 2) return;
@@ -209,6 +229,14 @@ export function useSimulation(numTrucks = 5) {
           t: now,
         });
         dumpTimestampsRef.current.push(now);
+
+        // Update Voronoi utilization & relocate any saturated zones
+        recomputeUtilization(voronoiRef.current, grid);
+        const relocated = reassignSaturatedZones(voronoiRef.current, grid);
+        for (const zid of relocated) {
+          reassignIdRef.current++;
+          reassignLogRef.current.push({ id: reassignIdRef.current, zoneId: zid, t: now });
+        }
 
         // Plan return
         const entry = ENTRY_POINTS[parseInt(truck.id.slice(2)) % ENTRY_POINTS.length];

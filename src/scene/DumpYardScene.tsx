@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { Terrain, GridOverlay } from "@/scene/Terrain";
 import { TruckMesh } from "@/scene/TruckMesh";
 import { PathLines, ReservationMarkers, DustParticles, V2XBeams } from "@/scene/Effects";
+import { VoronoiOverlay } from "@/scene/VoronoiOverlay";
 import { HudOverlay } from "@/components/HudOverlay";
 import { useSimulation } from "@/sim/useSimulation";
 import { WORLD_SIZE } from "@/sim/grid";
@@ -43,6 +44,7 @@ function CameraRig({ followId, trucks }: { followId: string | null; trucks: any[
 export function DumpYardScene() {
   const { state, gridRef } = useSimulation(5);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showZones, setShowZones] = useState(true);
   const [followTruck, setFollowTruck] = useState<string | null>(null);
 
   return (
@@ -81,6 +83,7 @@ export function DumpYardScene() {
         <ReservationMarkers gridRef={gridRef} tick={state.tick} />
         <DustParticles trucks={state.trucks} />
         <V2XBeams trucks={state.trucks} tick={state.tick} />
+        <VoronoiOverlay voronoi={state.voronoi} visible={showZones} />
 
         {!followTruck && (
           <OrbitControls
@@ -102,6 +105,10 @@ export function DumpYardScene() {
         events={state.events}
         showHeatmap={showHeatmap}
         onToggleHeatmap={() => setShowHeatmap((v) => !v)}
+        showZones={showZones}
+        onToggleZones={() => setShowZones((v) => !v)}
+        zones={state.voronoi.zones}
+        reassignments={state.reassignments}
         followTruck={followTruck}
         onFollowTruck={setFollowTruck}
       />
