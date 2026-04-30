@@ -150,8 +150,13 @@ export function useSimulation(numTrucks = 5) {
     const [tgx, tgy] = worldToGrid(truck.position[0], truck.position[2]);
 
     if (truck.state === "IDLE") {
-      // Plan: pick a dump cell, route there
-      const target = pickDumpCell(grid, [tgx, tgy], now);
+      // Plan: pick a dump cell within this truck's Voronoi zone
+      const v = voronoiRef.current;
+      const zone = zoneForTruck(v, truck.id);
+      const hint = zone
+        ? { assign: v.assign, preferredZone: zone.id, seed: zone.seed }
+        : undefined;
+      const target = pickDumpCell(grid, [tgx, tgy], now, hint);
       if (!target) return;
       const path = astar(grid, [tgx, tgy], target);
       if (!path || path.length < 2) return;
