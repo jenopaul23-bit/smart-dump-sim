@@ -53,6 +53,8 @@ export interface SimState {
   metrics: Metrics;
   events: DumpEvent[];
   tick: number;
+  voronoi: VoronoiState;
+  reassignments: { id: number; zoneId: number; t: number }[];
 }
 
 const TRUCK_SPEED_MPS = 6; // metres/sec
