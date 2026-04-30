@@ -44,6 +44,7 @@ function CameraRig({ followId, trucks }: { followId: string | null; trucks: any[
 export function DumpYardScene() {
   const { state, gridRef } = useSimulation(5);
   const [showHeatmap, setShowHeatmap] = useState(false);
+  const [showZones, setShowZones] = useState(true);
   const [followTruck, setFollowTruck] = useState<string | null>(null);
 
   return (
