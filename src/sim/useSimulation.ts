@@ -9,6 +9,10 @@ import { astar } from "@/sim/pathfinding";
 import {
   pickDumpCell, reserveFootprint, clearExpiredReservations, applyDump,
 } from "@/sim/dumpEngine";
+import {
+  makeVoronoi, recomputeUtilization, reassignSaturatedZones, zoneForTruck,
+  type VoronoiState,
+} from "@/sim/voronoi";
 
 const TRUCK_COLORS = ["#f59e0b", "#fb923c", "#fbbf24", "#facc15", "#fdba74"];
 const ENTRY_POINTS: [number, number][] = [
