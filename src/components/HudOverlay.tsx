@@ -1,6 +1,8 @@
 // HUD overlay: metrics panel + truck roster + live charts + heatmap toggle.
 import { useEffect, useRef } from "react";
 import type { Metrics, Truck, DumpEvent } from "@/sim/types";
+import type { Zone } from "@/sim/voronoi";
+import { REASSIGN_THRESHOLD } from "@/sim/voronoi";
 
 interface Props {
   metrics: Metrics;
@@ -8,11 +10,15 @@ interface Props {
   events: DumpEvent[];
   showHeatmap: boolean;
   onToggleHeatmap: () => void;
+  showZones: boolean;
+  onToggleZones: () => void;
+  zones: Zone[];
+  reassignments: { id: number; zoneId: number; t: number }[];
   followTruck: string | null;
   onFollowTruck: (id: string | null) => void;
 }
 
-export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatmap, followTruck, onFollowTruck }: Props) {
+export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatmap, showZones, onToggleZones, zones, reassignments, followTruck, onFollowTruck }: Props) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
       {/* Top bar */}
