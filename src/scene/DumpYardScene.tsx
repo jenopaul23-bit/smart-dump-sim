@@ -1,7 +1,7 @@
 // Main scene wrapper + camera controller (default isometric, follow-truck mode).
 import { useEffect, useRef, useState } from "react";
 import { Canvas, useThree } from "@react-three/fiber";
-import { OrbitControls, Environment, Sky } from "@react-three/drei";
+import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { Terrain, GridOverlay } from "@/scene/Terrain";
 import { TruckMesh } from "@/scene/TruckMesh";
@@ -49,7 +49,7 @@ export function DumpYardScene() {
     <div className="relative h-full w-full bg-background">
       <Canvas
         shadows
-        camera={{ position: [WORLD_SIZE * 0.7, WORLD_SIZE * 0.6, WORLD_SIZE * 0.7], fov: 45, near: 0.1, far: 1000 }}
+        camera={{ position: [WORLD_SIZE * 0.55, WORLD_SIZE * 0.45, WORLD_SIZE * 0.55], fov: 38, near: 0.1, far: 1000 }}
         gl={{ antialias: true, powerPreference: "high-performance" }}
       >
         <color attach="background" args={["#0a0d12"]} />
@@ -71,9 +71,7 @@ export function DumpYardScene() {
           shadow-camera-far={300}
         />
         <directionalLight position={[-60, 40, -80]} intensity={0.4} color="#8aa8d0" />
-        <hemisphereLight args={["#c8a878", "#1a1410", 0.3]} />
-
-        <Sky distance={4500} sunPosition={[80, 30, 60]} mieCoefficient={0.012} mieDirectionalG={0.85} rayleigh={2.5} turbidity={9} />
+        <hemisphereLight args={["#c8a878", "#0a0610", 0.4]} />
 
         <Terrain gridRef={gridRef} showHeatmap={showHeatmap} />
         <GridOverlay />
