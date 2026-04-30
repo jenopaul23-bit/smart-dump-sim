@@ -8,11 +8,22 @@ const W1 = 1.6;   // low-height preference
 const W2 = 0.8;   // proximity to truck
 const W3 = 0.5;   // center proximity (uniform packing)
 const W4 = 2.5;   // slope penalty
+const W5 = 1.4;   // zone affinity (Voronoi)
+
+export interface ZoneHint {
+  // Per-cell zone id for grid (flat GRID_SIZE*GRID_SIZE)
+  assign: Int8Array;
+  // Preferred zone id for this truck
+  preferredZone: number;
+  // Seed of preferred zone (for distance bias inside zone)
+  seed: [number, number];
+}
 
 export function pickDumpCell(
   grid: GridCell[][],
   truckGrid: [number, number],
-  now: number
+  now: number,
+  zoneHint?: ZoneHint
 ): [number, number] | null {
   const [tx, ty] = truckGrid;
   const candidates: { x: number; y: number; score: number }[] = [];
@@ -27,11 +38,23 @@ export function pickDumpCell(
       if (c.height >= MAX_PILE_HEIGHT) continue;
       const dist = Math.hypot(x - tx, y - ty);
       const centerProx = 1 - Math.hypot(x - cx, y - cy) / (GRID_SIZE / 2);
+      let zoneBonus = 0;
+      if (zoneHint) {
+        const z = zoneHint.assign[y * GRID_SIZE + x];
+        if (z === zoneHint.preferredZone) {
+          // Inside own zone: bonus + small pull toward seed
+          const sd = Math.hypot(x - zoneHint.seed[0], y - zoneHint.seed[1]);
+          zoneBonus = W5 * (1 - sd / GRID_SIZE);
+        } else {
+          zoneBonus = -W5 * 0.6; // soft penalty for poaching
+        }
+      }
       const score =
         W1 * (1 / (c.height + 0.5)) +
         W2 * (1 / (dist / maxDist + 0.1)) +
         W3 * centerProx -
-        W4 * c.slope;
+        W4 * c.slope +
+        zoneBonus;
       candidates.push({ x, y, score });
     }
   }
