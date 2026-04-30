@@ -64,6 +64,11 @@ export function useSimulation(numTrucks = 5) {
   const eventIdRef = useRef(0);
   const cycleSamplesRef = useRef<number[]>([]);
   const dumpTimestampsRef = useRef<number[]>([]);
+  const voronoiRef = useRef<VoronoiState>(
+    makeVoronoi(numTrucks, trucksRef.current.map(t => t.id))
+  );
+  const reassignLogRef = useRef<{ id: number; zoneId: number; t: number }[]>([]);
+  const reassignIdRef = useRef(0);
 
   const [state, setState] = useState<SimState>(() => ({
     grid: gridRef.current,
@@ -71,6 +76,8 @@ export function useSimulation(numTrucks = 5) {
     events: [],
     tick: 0,
     metrics: { totalDumps: 0, avgHeight: 0, utilization: 0, activeTrucks: 0, packingDensity: 0, throughput: 0, avgCycleMs: 0 },
+    voronoi: voronoiRef.current,
+    reassignments: [],
   }));
 
   const lastTimeRef = useRef(performance.now());
