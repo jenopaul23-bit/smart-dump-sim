@@ -230,6 +230,14 @@ export function useSimulation(numTrucks = 5) {
         });
         dumpTimestampsRef.current.push(now);
 
+        // Update Voronoi utilization & relocate any saturated zones
+        recomputeUtilization(voronoiRef.current, grid);
+        const relocated = reassignSaturatedZones(voronoiRef.current, grid);
+        for (const zid of relocated) {
+          reassignIdRef.current++;
+          reassignLogRef.current.push({ id: reassignIdRef.current, zoneId: zid, t: now });
+        }
+
         // Plan return
         const entry = ENTRY_POINTS[parseInt(truck.id.slice(2)) % ENTRY_POINTS.length];
         const [tgx2, tgy2] = worldToGrid(truck.position[0], truck.position[2]);
