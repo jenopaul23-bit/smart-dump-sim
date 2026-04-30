@@ -102,6 +102,8 @@ export function useSimulation(numTrucks = 5) {
           events: eventsRef.current.slice(-12),
           tick: tickRef.current,
           metrics: computeMetrics(now),
+          voronoi: voronoiRef.current,
+          reassignments: reassignLogRef.current.slice(-8),
         });
       }
       raf = requestAnimationFrame(loop);
