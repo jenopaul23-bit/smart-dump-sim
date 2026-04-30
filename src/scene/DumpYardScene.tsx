@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { Terrain, GridOverlay } from "@/scene/Terrain";
 import { TruckMesh } from "@/scene/TruckMesh";
 import { PathLines, ReservationMarkers, DustParticles, V2XBeams } from "@/scene/Effects";
+import { VoronoiOverlay } from "@/scene/VoronoiOverlay";
 import { HudOverlay } from "@/components/HudOverlay";
 import { useSimulation } from "@/sim/useSimulation";
 import { WORLD_SIZE } from "@/sim/grid";
