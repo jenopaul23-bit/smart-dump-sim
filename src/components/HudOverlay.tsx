@@ -232,3 +232,66 @@ function EventLog({ events }: { events: DumpEvent[] }) {
     </div>
   );
 }
+
+function ZonesPanel({ zones, reassignments }: { zones: Zone[]; reassignments: { id: number; zoneId: number; t: number }[] }) {
+  const totalReassign = zones.reduce((s, z) => s + z.reassignments, 0);
+  return (
+    <div className="hud-panel p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-[10px] tracking-widest text-primary">// VORONOI ZONES</span>
+        <span className="text-[9px] text-muted-foreground tracking-widest">
+          REASSIGN: <span className="text-foreground tabular-nums">{totalReassign}</span>
+        </span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {zones.map((z) => {
+          const pct = z.utilization * 100;
+          const saturated = z.utilization >= REASSIGN_THRESHOLD;
+          return (
+            <div key={z.id}>
+              <div className="flex items-center justify-between text-[10px] mb-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: z.color, boxShadow: `0 0 6px ${z.color}` }}
+                  />
+                  <span className="font-bold tracking-widest">Z{z.id}</span>
+                  <span className="text-muted-foreground">→ {z.truckId ?? "—"}</span>
+                </div>
+                <span
+                  className="tabular-nums tracking-widest"
+                  style={{ color: saturated ? "#ff5050" : z.color }}
+                >
+                  {pct.toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-1 bg-secondary overflow-hidden relative">
+                <div
+                  className="h-full transition-all"
+                  style={{
+                    width: `${Math.min(100, pct)}%`,
+                    backgroundColor: z.color,
+                    boxShadow: saturated ? `0 0 8px ${z.color}` : "none",
+                  }}
+                />
+                {/* 85% threshold marker */}
+                <div
+                  className="absolute top-0 bottom-0 w-px bg-foreground/40"
+                  style={{ left: `${REASSIGN_THRESHOLD * 100}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {reassignments.length > 0 && (
+        <div className="mt-3 pt-2 border-t border-border text-[9px] text-muted-foreground tracking-widest">
+          LAST RELOCATION: Z{reassignments[reassignments.length - 1].zoneId}
+          <span className="text-primary ml-1">
+            {((performance.now() - reassignments[reassignments.length - 1].t) / 1000).toFixed(0)}s ago
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
