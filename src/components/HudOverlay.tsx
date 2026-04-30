@@ -34,6 +34,14 @@ export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatm
         </div>
         <div className="flex items-center gap-2 text-[10px]">
           <button
+            onClick={onToggleZones}
+            className={`px-3 py-1.5 border tracking-widest transition ${
+              showZones ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            ZONES {showZones ? "ON" : "OFF"}
+          </button>
+          <button
             onClick={onToggleHeatmap}
             className={`px-3 py-1.5 border tracking-widest transition ${
               showHeatmap ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
@@ -49,8 +57,9 @@ export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatm
 
       <div className="flex-1 flex justify-between p-4 gap-4 overflow-hidden">
         {/* Left: Metrics + Charts */}
-        <div className="pointer-events-auto flex flex-col gap-3 w-72">
+        <div className="pointer-events-auto flex flex-col gap-3 w-72 overflow-y-auto">
           <MetricsPanel metrics={metrics} />
+          <ZonesPanel zones={zones} reassignments={reassignments} />
           <ChartCard title="PACKING DENSITY" value={metrics.packingDensity} max={1} unit="%" series="density" tick={metrics.totalDumps} />
           <ChartCard title="THROUGHPUT (60s)" value={metrics.throughput} max={20} unit="dumps" series="throughput" tick={metrics.totalDumps} />
           <ChartCard title="AVG CYCLE TIME" value={metrics.avgCycleMs / 1000} max={60} unit="s" series="cycle" tick={metrics.totalDumps} />
