@@ -56,10 +56,10 @@ export function DumpYardScene() {
         <fog attach="fog" args={["#0a0d12", 100, 350]} />
 
         {/* Lighting */}
-        <ambientLight intensity={0.35} color="#5a4a3a" />
+        <ambientLight intensity={1.2} color="#fff0d8" />
         <directionalLight
           position={[80, 120, 60]}
-          intensity={2.2}
+          intensity={2.0}
           color="#ffd9a8"
           castShadow
           shadow-mapSize={[2048, 2048]}
@@ -70,8 +70,8 @@ export function DumpYardScene() {
           shadow-camera-near={1}
           shadow-camera-far={300}
         />
-        <directionalLight position={[-60, 40, -80]} intensity={0.4} color="#8aa8d0" />
-        <hemisphereLight args={["#c8a878", "#0a0610", 0.4]} />
+        <directionalLight position={[-60, 40, -80]} intensity={0.6} color="#8aa8d0" />
+        <hemisphereLight args={["#c8a878", "#0a0610", 0.5]} />
 
         <Terrain gridRef={gridRef} showHeatmap={showHeatmap} />
         <GridOverlay />

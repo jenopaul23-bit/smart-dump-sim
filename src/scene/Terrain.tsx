@@ -82,8 +82,10 @@ export function Terrain({ gridRef, showHeatmap }: Props) {
 export function GridOverlay() {
   return (
     <gridHelper
-      args={[SIZE, SEG, "#f59e0b", "#3a2a18"]}
+      args={[SIZE, SEG, "#a06a20", "#5a3818"]}
       position={[0, 0.05, 0]}
-    />
+    >
+      <meshBasicMaterial attach="material" transparent opacity={0.18} />
+    </gridHelper>
   );
 }
