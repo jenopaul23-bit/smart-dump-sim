@@ -120,7 +120,29 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground;
+  html, body, #root {
+    @apply h-full w-full overflow-hidden;
   }
+
+  body {
+    @apply bg-background text-foreground font-mono;
+    font-family: var(--font-mono);
+  }
+}
+
+@layer utilities {
+  .hud-panel {
+    background: var(--gradient-hud);
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-hud);
+    backdrop-filter: blur(12px);
+  }
+  .hud-glow {
+    text-shadow: 0 0 8px hsl(var(--hud-glow) / 0.6);
+  }
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
