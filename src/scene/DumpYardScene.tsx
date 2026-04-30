@@ -83,6 +83,7 @@ export function DumpYardScene() {
         <ReservationMarkers gridRef={gridRef} tick={state.tick} />
         <DustParticles trucks={state.trucks} />
         <V2XBeams trucks={state.trucks} tick={state.tick} />
+        <VoronoiOverlay voronoi={state.voronoi} visible={showZones} />
 
         {!followTruck && (
           <OrbitControls
