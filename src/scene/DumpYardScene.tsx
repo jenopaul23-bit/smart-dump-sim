@@ -105,6 +105,10 @@ export function DumpYardScene() {
         events={state.events}
         showHeatmap={showHeatmap}
         onToggleHeatmap={() => setShowHeatmap((v) => !v)}
+        showZones={showZones}
+        onToggleZones={() => setShowZones((v) => !v)}
+        zones={state.voronoi.zones}
+        reassignments={state.reassignments}
         followTruck={followTruck}
         onFollowTruck={setFollowTruck}
       />
