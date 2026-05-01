@@ -41,6 +41,15 @@ export function Terrain({ gridRef, showHeatmap, showEmptyGrid }: Props) {
     return g;
   }, []);
 
+  const noiseOffsets = useMemo(() => {
+    const arr = new Float32Array(SEG * SEG);
+    for (let i = 0; i < arr.length; i++) {
+      // High frequency micro-variation noise (max 25cm perturbation)
+      arr[i] = (Math.random() - 0.5) * 0.25; 
+    }
+    return arr;
+  }, []);
+
   useFrame((state, delta) => {
     const grid = gridRef.current;
     const pos = geom.attributes.position as THREE.BufferAttribute;
@@ -65,7 +74,9 @@ export function Terrain({ gridRef, showHeatmap, showEmptyGrid }: Props) {
           needsUpdate = true;
         }
 
-        pos.setY(i, currentH);
+        // Apply physical static noise to piles and ground
+        const bump = currentH > 0.1 ? noiseOffsets[i] * (1 + currentH * 0.1) : noiseOffsets[i] * 0.2;
+        pos.setY(i, currentH + bump);
 
         if (showHeatmap) {
           const t = Math.min(1, currentH / MAX_PILE_HEIGHT);
@@ -83,6 +94,11 @@ export function Terrain({ gridRef, showHeatmap, showEmptyGrid }: Props) {
             const t = Math.min(1, currentH / 5);
             if (t < 0.5) c.lerpColors(matColors.low, matColors.high, t / 0.5);
             else c.lerpColors(matColors.high, matColors.crest, (t - 0.5) / 0.5);
+            
+            // Add subtle color noise to break up solid faces
+            c.r += (Math.random() - 0.5) * 0.05;
+            c.g += (Math.random() - 0.5) * 0.05;
+            c.b += (Math.random() - 0.5) * 0.05;
             // slope shading
             const sh = Math.max(0, 1 - cell.slope * 0.8);
             c.multiplyScalar(0.6 + 0.4 * sh);
@@ -101,7 +117,14 @@ export function Terrain({ gridRef, showHeatmap, showEmptyGrid }: Props) {
 
   return (
     <mesh ref={meshRef} geometry={geom} receiveShadow castShadow>
-      <meshStandardMaterial vertexColors roughness={0.95} metalness={0.05} flatShading={false} />
+      <meshPhysicalMaterial 
+        vertexColors 
+        roughness={1.0} 
+        metalness={0.1} 
+        clearcoat={0.0}
+        flatShading={false} 
+        wireframe={false}
+      />
     </mesh>
   );
 }

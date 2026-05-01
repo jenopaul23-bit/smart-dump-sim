@@ -38,25 +38,25 @@ export function TruckMesh({ truck, isNight }: Props) {
         {/* Chassis / Frame */}
         <mesh position={[0, 0.6, 0]} castShadow>
           <boxGeometry args={[2.0, 0.6, 4.8]} />
-          <meshStandardMaterial color={dark} roughness={0.8} metalness={0.6} />
+          <meshPhysicalMaterial color={dark} roughness={0.95} metalness={0.7} clearcoat={0.0} />
         </mesh>
         
         {/* Front Grille & Radiator */}
         <mesh position={[0, 0.6, 2.45]} castShadow>
           <boxGeometry args={[1.8, 1.2, 0.2]} />
-          <meshStandardMaterial color="#111" roughness={0.9} metalness={0.8} />
+          <meshPhysicalMaterial color="#111" roughness={0.95} metalness={0.8} />
         </mesh>
 
         {/* Front Bumper & Deck */}
         <mesh position={[0, 1.3, 2.3]} castShadow>
           <boxGeometry args={[2.8, 0.2, 1.0]} />
-          <meshStandardMaterial color={bodyColor} roughness={0.5} metalness={0.4} />
+          <meshPhysicalMaterial color={bodyColor} roughness={0.85} metalness={0.4} clearcoat={0.1} />
         </mesh>
 
         {/* Asymmetrical Cab (Left side for typical CAT) */}
         <mesh position={[-0.8, 1.8, 2.2]} castShadow>
           <boxGeometry args={[0.9, 0.8, 0.8]} />
-          <meshStandardMaterial color={bodyColor} roughness={0.4} metalness={0.5} />
+          <meshPhysicalMaterial color={bodyColor} roughness={0.85} metalness={0.4} clearcoat={0.1} />
         </mesh>
         {/* Windshield */}
         <mesh position={[-0.8, 1.9, 2.61]} rotation={[-0.1, 0, 0]}>

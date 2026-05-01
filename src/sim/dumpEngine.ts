@@ -13,7 +13,8 @@ export function pickDumpCell(
   grid: GridCell[][],
   truckGrid: [number, number],
   now: number,
-  entryPoint: [number, number] = [2, 2]
+  entryPoint: [number, number] = [2, 2],
+  isDemoMode: boolean = false
 ): [number, number] | null {
   // 1. Hexagonal/Staggered Grid: Enforcing exactly 3.03m gap between dumps
   // Dump diameter is ~4m. 4m + 3.03m gap = 7.03m center-to-center.
@@ -44,12 +45,17 @@ export function pickDumpCell(
 
   let candidates: { x: number; y: number; score: number }[] = [];
 
-  for (let yF = GRID_SIZE - 4; yF >= 4; yF -= rowStepCells) {
+  const maxX = isDemoMode ? 22 : GRID_SIZE - 4;
+  const minX = isDemoMode ? 8 : 4;
+  const maxY = isDemoMode ? 18 : GRID_SIZE - 4;
+  const minY = isDemoMode ? 8 : 4;
+
+  for (let yF = maxY; yF >= minY; yF -= rowStepCells) {
     // Offset every other row to create a honeycomb pattern
-    const rowIdx = Math.round((GRID_SIZE - 4 - yF) / rowStepCells);
+    const rowIdx = Math.round((maxY - yF) / rowStepCells);
     const rowOffset = (rowIdx % 2 === 0) ? 0 : (stepCells / 2);
 
-    for (let xF = GRID_SIZE - 4 - rowOffset; xF >= 4; xF -= stepCells) {
+    for (let xF = maxX - rowOffset; xF >= minX; xF -= stepCells) {
       const x = Math.round(xF);
       const y = Math.round(yF);
       

@@ -4,7 +4,66 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import type { Truck, GridCell } from "@/sim/types";
-import { GRID_SIZE, gridToWorld } from "@/sim/grid";
+import { GRID_SIZE, gridToWorld, MAX_PILE_HEIGHT } from "@/sim/grid";
+
+// Dynamic instanced rubble rendering for extreme realism in Demo Mode
+export function RockRubble({ gridRef, isDemoMode }: { gridRef: React.MutableRefObject<GridCell[][]>; isDemoMode: boolean }) {
+  const meshRef = useRef<THREE.InstancedMesh>(null);
+  const COUNT = 1500; // number of rocks
+  
+  // Random static attributes for rocks
+  const rockData = useMemo(() => {
+    const data = [];
+    for (let i = 0; i < COUNT; i++) {
+      data.push({
+        gridX: Math.floor(Math.random() * GRID_SIZE),
+        gridY: Math.floor(Math.random() * GRID_SIZE),
+        offsetX: (Math.random() - 0.5) * 1.5,
+        offsetZ: (Math.random() - 0.5) * 1.5,
+        rotX: Math.random() * Math.PI,
+        rotY: Math.random() * Math.PI,
+        rotZ: Math.random() * Math.PI,
+        scale: Math.random() * 0.4 + 0.1,
+      });
+    }
+    return data;
+  }, []);
+
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  useFrame(() => {
+    if (!isDemoMode || !meshRef.current) return;
+    const grid = gridRef.current;
+    
+    let visibleCount = 0;
+    for (let i = 0; i < COUNT; i++) {
+      const rock = rockData[i];
+      const cell = grid[rock.gridY]?.[rock.gridX];
+      if (!cell || cell.height < 0.2) continue; // Only spawn on existing piles
+
+      const [wx, wz] = gridToWorld(rock.gridX, rock.gridY);
+      
+      dummy.position.set(wx + rock.offsetX, cell.height + rock.scale * 0.5, wz + rock.offsetZ);
+      dummy.rotation.set(rock.rotX, rock.rotY, rock.rotZ);
+      dummy.scale.set(rock.scale, rock.scale, rock.scale);
+      dummy.updateMatrix();
+      
+      meshRef.current.setMatrixAt(visibleCount, dummy.matrix);
+      visibleCount++;
+    }
+    meshRef.current.count = visibleCount;
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  if (!isDemoMode) return null;
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, COUNT]} castShadow receiveShadow>
+      <dodecahedronGeometry args={[1, 0]} />
+      <meshPhysicalMaterial color="#5c2616" roughness={1.0} metalness={0.1} flatShading={true} />
+    </instancedMesh>
+  );
+}
 
 export function PathLines({ trucks }: { trucks: Truck[] }) {
   return (

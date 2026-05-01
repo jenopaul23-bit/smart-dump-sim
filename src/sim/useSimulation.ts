@@ -42,6 +42,12 @@ function makeTrucks(n: number): Truck[] {
       totalDumps: 0,
     });
   }
+  
+  // Apply default material if it is not MIXED (e.g. IRON_ORE)
+  trucks.forEach((t, idx) => {
+    t.material = "IRON_ORE";
+  });
+  
   return trucks;
 }
 
@@ -59,16 +65,18 @@ export function useSimulation(initialTrucks = 5) {
   const gridRef = useRef<GridCell[][]>(makeGrid());
   const trucksRef = useRef<Truck[]>(makeTrucks(initialTrucks));
   const [targetTruckCount, setTargetTruckCount] = useState(initialTrucks);
+  const [isDemoMode, setIsDemoModeState] = useState(false);
+  const isDemoModeRef = useRef(false);
   const eventsRef = useRef<DumpEvent[]>([]);
   const eventIdRef = useRef(0);
   const cycleSamplesRef = useRef<number[]>([]);
   const dumpTimestampsRef = useRef<number[]>([]);
   const [simSpeed, setSimSpeedState] = useState(1);
   const simSpeedRef = useRef(1);
-  
-  const [selectedMaterial, setSelectedMaterialState] = useState<string>("MIXED");
-  const selectedMaterialRef = useRef<string>("MIXED");
-  
+
+  const [selectedMaterial, setSelectedMaterialState] = useState<string>("IRON_ORE");
+  const selectedMaterialRef = useRef<string>("IRON_ORE");
+
   const setSelectedMaterial = (m: string) => {
     selectedMaterialRef.current = m;
     setSelectedMaterialState(m);
@@ -80,6 +88,24 @@ export function useSimulation(initialTrucks = 5) {
   const setSimSpeed = (speed: number) => {
     simSpeedRef.current = speed;
     setSimSpeedState(speed);
+  };
+
+  const setIsDemoMode = (val: boolean) => {
+    isDemoModeRef.current = val;
+    setIsDemoModeState(val);
+    gridRef.current = makeGrid(); // Wipe terrain
+    eventsRef.current = [];
+    tickRef.current = 0;
+    cycleSamplesRef.current = [];
+    dumpTimestampsRef.current = [];
+    
+    if (val) {
+      setTargetTruckCount(1);
+      trucksRef.current = makeTrucks(1);
+    } else {
+      setTargetTruckCount(5);
+      trucksRef.current = makeTrucks(5);
+    }
   };
 
   const [state, setState] = useState<SimState>(() => ({
@@ -178,21 +204,26 @@ export function useSimulation(initialTrucks = 5) {
     const [tgx, tgy] = worldToGrid(truck.position[0], truck.position[2]);
 
     if (truck.state === "IDLE") {
+      // In demo mode, stop exactly after 4 dumps so the user can easily observe the packing.
+      if (isDemoModeRef.current && truck.totalDumps >= 4) {
+        return;
+      }
+      
       // Plan: pick a dump cell
       const entry = ENTRY_POINTS[0];
-      const target = pickDumpCell(grid, [tgx, tgy], now, entry);
+      const target = pickDumpCell(grid, [tgx, tgy], now, entry, isDemoModeRef.current);
       if (!target) return;
-      
+
       // We pathfind directly to the target, which pickDumpCell already guaranteed is reachable.
       let path = astar(grid, [tgx, tgy], target);
       if (!path || path.length < 2) return;
-      
+
       // Stop the truck a few steps before the exact target center 
       // to avoid it driving completely up a forming peak
       if (path.length > 3) {
         path = path.slice(0, path.length - 2);
       }
-      
+
       reserveFootprint(grid, target, truck.heading, truck.size, now, 12000);
       truck.target = target;
       truck.path = path;
@@ -285,7 +316,19 @@ export function useSimulation(initialTrucks = 5) {
     }
   }
 
-  return { state, gridRef, trucksRef, targetTruckCount, setTargetTruckCount, simSpeed, setSimSpeed, selectedMaterial, setSelectedMaterial };
+  return { 
+    state, 
+    gridRef, 
+    trucksRef, 
+    targetTruckCount, 
+    setTargetTruckCount, 
+    simSpeed, 
+    setSimSpeed, 
+    selectedMaterial, 
+    setSelectedMaterial,
+    isDemoMode,
+    setIsDemoMode,
+  };
 }
 
 function terrainHeightAt(grid: GridCell[][], gx: number, gy: number) {

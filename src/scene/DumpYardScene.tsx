@@ -5,66 +5,78 @@ import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import { Terrain, GridOverlay } from "@/scene/Terrain";
 import { TruckMesh } from "@/scene/TruckMesh";
-import { PathLines, ReservationMarkers, DustParticles, V2XBeams } from "@/scene/Effects";
+import { PathLines, ReservationMarkers, DustParticles, V2XBeams, RockRubble } from "@/scene/Effects";
 import { HudOverlay } from "@/components/HudOverlay";
 import { useSimulation } from "@/sim/useSimulation";
 import { WORLD_SIZE } from "@/sim/grid";
 
-function CameraRig({ followId, trucks }: { followId: string | null; trucks: any[] }) {
+export type CameraView = "ADMIN" | "TOP" | "SIDE" | "VEHICLE";
+
+function CameraRig({ cameraView, trucks }: { cameraView: CameraView; trucks: any[] }) {
   const { camera } = useThree();
   const lerpTarget = useRef(new THREE.Vector3());
 
   useEffect(() => {
     let raf = 0;
     const loop = () => {
-      if (followId) {
-        const t = trucks.find((x) => x.id === followId);
-        if (t) {
-          lerpTarget.current.set(t.position[0], t.position[1] + 2, t.position[2]);
-          const offset = new THREE.Vector3(
-            -Math.sin(t.heading) * 18,
-            14,
-            -Math.cos(t.heading) * 18
-          );
-          const desired = lerpTarget.current.clone().add(offset);
-          camera.position.lerp(desired, 0.08);
-          camera.lookAt(lerpTarget.current);
-        }
+      if (cameraView === "VEHICLE" && trucks.length > 0) {
+        const t = trucks[0];
+        lerpTarget.current.set(t.position[0], t.position[1] + 2, t.position[2]);
+        const offset = new THREE.Vector3(
+          -Math.sin(t.heading) * 18,
+          14,
+          -Math.cos(t.heading) * 18
+        );
+        const desired = lerpTarget.current.clone().add(offset);
+        camera.position.lerp(desired, 0.08);
+        camera.lookAt(lerpTarget.current);
+      } else if (cameraView === "TOP") {
+        const desired = new THREE.Vector3(0, 150, 1); // Slight Z offset to prevent gimbal lock
+        camera.position.lerp(desired, 0.05);
+        lerpTarget.current.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+        camera.lookAt(lerpTarget.current);
+      } else if (cameraView === "SIDE") {
+        const desired = new THREE.Vector3(WORLD_SIZE * 0.7, 30, 0);
+        camera.position.lerp(desired, 0.05);
+        lerpTarget.current.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+        camera.lookAt(lerpTarget.current);
       }
+      
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(raf);
-  }, [followId, trucks, camera]);
+  }, [cameraView, trucks, camera]);
 
   return null;
 }
 
 export function DumpYardScene() {
-  const { state, gridRef, targetTruckCount, setTargetTruckCount, simSpeed, setSimSpeed, selectedMaterial, setSelectedMaterial } = useSimulation(5);
+  const { state, gridRef, targetTruckCount, setTargetTruckCount, simSpeed, setSimSpeed, selectedMaterial, setSelectedMaterial, isDemoMode, setIsDemoMode } = useSimulation(5);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showEmptyGrid, setShowEmptyGrid] = useState(false);
-  const [followTruck, setFollowTruck] = useState<string | null>(null);
+  const [cameraView, setCameraView] = useState<CameraView>("ADMIN");
   const [isNight, setIsNight] = useState(false);
 
   return (
     <div className={`relative h-full w-full ${isNight ? "bg-[#02040a]" : "bg-background"}`}>
       <Canvas
         shadows
+        dpr={[1, 1.5]}
         camera={{ position: [WORLD_SIZE * 0.55, WORLD_SIZE * 0.45, WORLD_SIZE * 0.55], fov: 38, near: 0.1, far: 1000 }}
         gl={{ antialias: true, powerPreference: "high-performance" }}
       >
-        <color attach="background" args={[isNight ? "#02040a" : "#ffffff"]} />
-        <fog attach="fog" args={[isNight ? "#02040a" : "#ffffff", 100, 350]} />
+        <color attach="background" args={[isNight ? "#02040a" : "#d2c3b3"]} />
+        <fogExp2 attach="fog" args={[isNight ? "#02040a" : "#d2c3b3", 0.0035]} />
 
         {/* Lighting */}
-        <ambientLight intensity={isNight ? 0.15 : 1.2} color={isNight ? "#445566" : "#fff0d8"} />
+        <ambientLight intensity={isNight ? 0.15 : 0.8} color={isNight ? "#445566" : "#fff0d8"} />
         <directionalLight
           position={[80, 120, 60]}
           intensity={isNight ? 0.3 : 2.0}
           color={isNight ? "#aaccff" : "#ffd9a8"}
           castShadow
-          shadow-mapSize={[2048, 2048]}
+          shadow-mapSize={[1024, 1024]}
           shadow-camera-left={-WORLD_SIZE / 2}
           shadow-camera-right={WORLD_SIZE / 2}
           shadow-camera-top={WORLD_SIZE / 2}
@@ -93,8 +105,9 @@ export function DumpYardScene() {
         <ReservationMarkers gridRef={gridRef} tick={state.tick} />
         <DustParticles trucks={state.trucks} />
         <V2XBeams trucks={state.trucks} tick={state.tick} />
+        <RockRubble gridRef={gridRef} isDemoMode={isDemoMode} />
 
-        {!followTruck && (
+        {!isDemoMode && cameraView === "ADMIN" && (
           <OrbitControls
             target={[0, 2, 0]}
             enablePan
@@ -105,7 +118,7 @@ export function DumpYardScene() {
             maxPolarAngle={Math.PI / 2.1}
           />
         )}
-        <CameraRig followId={followTruck} trucks={state.trucks} />
+        <CameraRig cameraView={cameraView} trucks={state.trucks} />
       </Canvas>
 
       <HudOverlay
@@ -119,14 +132,16 @@ export function DumpYardScene() {
         showHeatmap={showHeatmap}
         onToggleHeatmap={() => setShowHeatmap((v) => !v)}
         showEmptyGrid={showEmptyGrid}
-        onToggleEmptyGrid={() => setShowEmptyGrid((v) => !v)}
-        followTruck={followTruck}
-        onFollowTruck={setFollowTruck}
+        onToggleEmptyGrid={() => setShowEmptyGrid(!showEmptyGrid)}
+        cameraView={cameraView}
+        onCameraViewChange={setCameraView}
         selectedMaterial={selectedMaterial}
         onSelectedMaterialChange={setSelectedMaterial}
         isNight={isNight}
-        onToggleNight={() => setIsNight(v => !v)}
+        onToggleNight={() => setIsNight(!isNight)}
         gridRef={gridRef}
+        isDemoMode={isDemoMode}
+        onToggleDemoMode={() => setIsDemoMode(!isDemoMode)}
       />
     </div>
   );

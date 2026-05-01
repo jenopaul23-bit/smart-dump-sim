@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import type { Metrics, Truck, DumpEvent } from "@/sim/types";
 import type { Zone } from "@/sim/voronoi";
 import { REASSIGN_THRESHOLD } from "@/sim/voronoi";
+import { DemoAvatar } from "./DemoAvatar";
 
 interface Props {
   truckCount: number;
@@ -16,16 +17,18 @@ interface Props {
   onToggleHeatmap: () => void;
   showEmptyGrid?: boolean;
   onToggleEmptyGrid?: () => void;
-  followTruck: string | null;
-  onFollowTruck: (id: string | null) => void;
+  cameraView: "ADMIN" | "TOP" | "SIDE" | "VEHICLE";
+  onCameraViewChange: (view: "ADMIN" | "TOP" | "SIDE" | "VEHICLE") => void;
   selectedMaterial: string;
   onSelectedMaterialChange: (m: string) => void;
   isNight: boolean;
   onToggleNight: () => void;
   gridRef?: React.MutableRefObject<any>;
+  isDemoMode?: boolean;
+  onToggleDemoMode?: () => void;
 }
 
-export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpeedChange, metrics, trucks, events, showHeatmap, onToggleHeatmap, showEmptyGrid, onToggleEmptyGrid, followTruck, onFollowTruck, selectedMaterial, onSelectedMaterialChange, isNight, onToggleNight, gridRef }: Props) {
+export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpeedChange, metrics, trucks, events, showHeatmap, onToggleHeatmap, showEmptyGrid, onToggleEmptyGrid, cameraView, onCameraViewChange, selectedMaterial, onSelectedMaterialChange, isNight, onToggleNight, gridRef, isDemoMode, onToggleDemoMode }: Props) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
       {/* Top bar */}
@@ -77,9 +80,9 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
               onChange={(e) => onSelectedMaterialChange(e.target.value)}
               className="bg-background border border-border text-primary text-[10px] tracking-widest outline-none py-1 px-2 cursor-pointer"
             >
+              <option value="IRON_ORE">IRON ORE</option>
               <option value="MIXED">MIXED</option>
               <option value="COAL">COAL</option>
-              <option value="IRON_ORE">IRON ORE</option>
               <option value="LIMESTONE">LIMESTONE</option>
               <option value="OVERBURDEN">OVERBURDEN</option>
             </select>
@@ -92,6 +95,31 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
               }`}
             >
               DEBUG GRID {showEmptyGrid ? "ON" : "OFF"}
+            </button>
+          )}
+          
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] text-muted-foreground tracking-widest uppercase">CAMERA:</span>
+            <select
+              value={cameraView}
+              onChange={(e) => onCameraViewChange(e.target.value as any)}
+              className="bg-transparent text-primary text-[10px] tracking-widest outline-none border-b border-primary/30 pb-0.5 cursor-pointer uppercase"
+            >
+              <option className="bg-background" value="ADMIN">ADMIN</option>
+              <option className="bg-background" value="TOP">TOP</option>
+              <option className="bg-background" value="SIDE">SIDE</option>
+              <option className="bg-background" value="VEHICLE">VEHICLE</option>
+            </select>
+          </div>
+
+          {onToggleDemoMode && (
+            <button
+              onClick={onToggleDemoMode}
+              className={`px-3 py-1.5 border tracking-widest transition ${
+                isDemoMode ? "bg-red-900/50 text-red-400 border-red-500/50" : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              DEMO: {isDemoMode ? "1-TRUCK (4 DUMPS)" : "OFF"}
             </button>
           )}
           <button
@@ -127,7 +155,7 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
 
         {/* Right: Truck roster */}
         <div className="pointer-events-auto flex flex-col gap-3 w-72">
-          <TruckRoster trucks={trucks} followTruck={followTruck} onFollow={onFollowTruck} />
+          <TruckRoster trucks={trucks} followTruck={cameraView === "VEHICLE" && trucks.length > 0 ? trucks[0].id : null} onFollow={() => onCameraViewChange("VEHICLE")} />
           <EventLog events={events} />
         </div>
       </div>
@@ -145,12 +173,15 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
       </footer>
 
       {/* Active Truck Telemetry Card */}
-      {followTruck && (
+      {cameraView === "VEHICLE" && trucks.length > 0 && (
         <>
-          <LidarRadar truck={trucks.find((t) => t.id === followTruck)} gridRef={gridRef} />
-          <LiveTelemetryCard truck={trucks.find((t) => t.id === followTruck)} />
+          <LidarRadar truck={trucks[0]} gridRef={gridRef} />
+          <LiveTelemetryCard truck={trucks[0]} />
         </>
       )}
+
+      {/* Demo Mode Avatar Guide */}
+      <DemoAvatar trucks={trucks} isDemoMode={!!isDemoMode} />
     </div>
   );
 }
