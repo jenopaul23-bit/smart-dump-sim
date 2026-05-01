@@ -1,4 +1,6 @@
 // Digital twin domain types
+export type MaterialType = "COAL" | "IRON_ORE" | "LIMESTONE" | "OVERBURDEN";
+
 export interface GridCell {
   x: number;
   y: number;
@@ -8,6 +10,7 @@ export interface GridCell {
   accessibility: boolean;
   reserved: boolean;
   reservedUntil: number; // ms timestamp
+  material?: MaterialType;
 }
 
 export type TruckState = "MOVING" | "ARRIVED" | "DUMPING" | "RETURNING" | "IDLE";
@@ -21,6 +24,7 @@ export interface Truck {
   load: number; // 0..1
   size: "S" | "M" | "L";
   color: string;
+  material: MaterialType;
   path: [number, number][]; // grid coords
   pathIndex: number;
   target?: [number, number]; // grid coord

@@ -2,6 +2,7 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
+import { Line } from "@react-three/drei";
 import type { Truck, GridCell } from "@/sim/types";
 import { GRID_SIZE, gridToWorld } from "@/sim/grid";
 
@@ -14,14 +15,21 @@ export function PathLines({ trucks }: { trucks: Truck[] }) {
         if (remaining.length < 2) return null;
         const points = remaining.map(([gx, gy]) => {
           const [wx, wz] = gridToWorld(gx, gy);
-          return new THREE.Vector3(wx, 0.3, wz);
+          return new THREE.Vector3(wx, 0.4, wz);
         });
-        const geom = new THREE.BufferGeometry().setFromPoints(points);
         return (
-          <line key={t.id}>
-            <primitive object={geom} attach="geometry" />
-            <lineBasicMaterial color={t.color} transparent opacity={0.85} linewidth={2} />
-          </line>
+          <Line
+            key={t.id}
+            points={points}
+            color={t.color}
+            lineWidth={4} // Thicker, more visible laser line
+            dashed={true}
+            dashScale={5}
+            dashSize={2}
+            dashOffset={-performance.now() / 500} // Animated marching effect
+            transparent
+            opacity={0.8}
+          />
         );
       })}
     </group>
@@ -55,10 +63,18 @@ export function ReservationMarkers({ gridRef, tick }: { gridRef: React.MutableRe
         const [wx, wz] = gridToWorld(c.x, c.y);
         const h = grid[c.y][c.x].height;
         return (
-          <mesh key={i} position={[wx, h + 1.2, wz]}>
-            <boxGeometry args={[5, 2.4, 5]} />
-            <meshBasicMaterial color="#22d3ee" transparent opacity={0.18 * pulse} wireframe />
-          </mesh>
+          <group key={i} position={[wx, h + 1.2, wz]}>
+            {/* Spinning Holographic Cylinder */}
+            <mesh rotation-x={Math.PI / 2} rotation-z={tick * 0.05}>
+              <cylinderGeometry args={[2.5, 2.5, 0.8, 16, 1, true]} />
+              <meshBasicMaterial color="#00ffcc" transparent opacity={0.4 * pulse} side={THREE.DoubleSide} />
+            </mesh>
+            {/* Pulsing Core */}
+            <mesh position={[0, -0.8, 0]}>
+              <boxGeometry args={[3, 0.2, 3]} />
+              <meshBasicMaterial color="#00ffcc" transparent opacity={0.6 * pulse} />
+            </mesh>
+          </group>
         );
       })}
     </group>

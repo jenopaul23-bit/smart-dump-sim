@@ -9,24 +9,29 @@ import { GRID_SIZE, CELL_M, MAX_PILE_HEIGHT } from "@/sim/grid";
 interface Props {
   gridRef: React.MutableRefObject<GridCell[][]>;
   showHeatmap: boolean;
+  showEmptyGrid?: boolean;
 }
 
 const SEG = GRID_SIZE; // one vertex per cell corner
 const SIZE = GRID_SIZE * CELL_M;
 
-// Color mining palette
-const C_LOW = new THREE.Color("#3d2a1a");
-const C_MID = new THREE.Color("#7a5230");
-const C_HIGH = new THREE.Color("#b88a55");
-const C_CREST = new THREE.Color("#d9b27a");
+// Color palettes per material
+const MAT_COLORS = {
+  COAL: { low: new THREE.Color("#2a2a2a"), high: new THREE.Color("#1a1a1a"), crest: new THREE.Color("#0f0f0f") },
+  IRON_ORE: { low: new THREE.Color("#8c3a21"), high: new THREE.Color("#6e2b17"), crest: new THREE.Color("#d96341") },
+  LIMESTONE: { low: new THREE.Color("#d1cfc7"), high: new THREE.Color("#a6a59e"), crest: new THREE.Color("#f0efe9") },
+  OVERBURDEN: { low: new THREE.Color("#7a5230"), high: new THREE.Color("#3d2a1a"), crest: new THREE.Color("#d9b27a") },
+};
+
+const C_EMPTY = new THREE.Color("#1e1e1e"); // Dark base surface
 
 const H_LOW = new THREE.Color("#1f7a3a");
 const H_MID = new THREE.Color("#e0b020");
 const H_HIGH = new THREE.Color("#c0392b");
 
-export function Terrain({ gridRef, showHeatmap }: Props) {
+export function Terrain({ gridRef, showHeatmap, showEmptyGrid }: Props) {
   const meshRef = useRef<THREE.Mesh>(null);
-  const tickRef = useRef(0);
+  const currentHeights = useRef<Float32Array>(new Float32Array(SEG * SEG));
 
   const geom = useMemo(() => {
     const g = new THREE.PlaneGeometry(SIZE, SIZE, SEG - 1, SEG - 1);
@@ -36,39 +41,62 @@ export function Terrain({ gridRef, showHeatmap }: Props) {
     return g;
   }, []);
 
-  useFrame(() => {
-    tickRef.current++;
-    if (tickRef.current % 3 !== 0) return; // throttle
+  useFrame((state, delta) => {
     const grid = gridRef.current;
     const pos = geom.attributes.position as THREE.BufferAttribute;
     const col = geom.attributes.color as THREE.BufferAttribute;
     const c = new THREE.Color();
+    let needsUpdate = false;
+
     for (let y = 0; y < SEG; y++) {
       for (let x = 0; x < SEG; x++) {
         const cell = grid[Math.min(GRID_SIZE - 1, y)][Math.min(GRID_SIZE - 1, x)];
         const i = y * SEG + x;
-        pos.setY(i, cell.height);
+        const targetH = cell.height;
+        let currentH = currentHeights.current[i];
+
+        if (Math.abs(targetH - currentH) > 0.01) {
+          currentH = THREE.MathUtils.lerp(currentH, targetH, 10 * delta);
+          currentHeights.current[i] = currentH;
+          needsUpdate = true;
+        } else if (currentH !== targetH) {
+          currentH = targetH;
+          currentHeights.current[i] = currentH;
+          needsUpdate = true;
+        }
+
+        pos.setY(i, currentH);
+
         if (showHeatmap) {
-          const t = Math.min(1, cell.height / MAX_PILE_HEIGHT);
+          const t = Math.min(1, currentH / MAX_PILE_HEIGHT);
           if (t < 0.5) c.lerpColors(H_LOW, H_MID, t * 2);
           else c.lerpColors(H_MID, H_HIGH, (t - 0.5) * 2);
           // mix with slope warning
           if (cell.slope > 0.45) c.lerp(new THREE.Color("#ff3030"), 0.4);
+        } else if (showEmptyGrid) {
+          c.copy(C_EMPTY);
         } else {
-          const t = Math.min(1, cell.height / 5);
-          if (t < 0.4) c.lerpColors(C_LOW, C_MID, t / 0.4);
-          else if (t < 0.75) c.lerpColors(C_MID, C_HIGH, (t - 0.4) / 0.35);
-          else c.lerpColors(C_HIGH, C_CREST, (t - 0.75) / 0.25);
-          // slope shading
-          const sh = Math.max(0, 1 - cell.slope * 0.8);
-          c.multiplyScalar(0.6 + 0.4 * sh);
+          if (currentH <= 0.01) {
+            c.copy(C_EMPTY);
+          } else {
+            const matColors = MAT_COLORS[cell.material || "OVERBURDEN"];
+            const t = Math.min(1, currentH / 5);
+            if (t < 0.5) c.lerpColors(matColors.low, matColors.high, t / 0.5);
+            else c.lerpColors(matColors.high, matColors.crest, (t - 0.5) / 0.5);
+            // slope shading
+            const sh = Math.max(0, 1 - cell.slope * 0.8);
+            c.multiplyScalar(0.6 + 0.4 * sh);
+          }
         }
         col.setXYZ(i, c.r, c.g, c.b);
       }
     }
+    
     pos.needsUpdate = true;
     col.needsUpdate = true;
-    geom.computeVertexNormals();
+    if (needsUpdate) {
+      geom.computeVertexNormals();
+    }
   });
 
   return (
@@ -95,7 +123,7 @@ export function GridOverlay() {
   }, []);
   return (
     <lineSegments geometry={geom}>
-      <lineBasicMaterial color="#a06a20" transparent opacity={0.12} />
+      <lineBasicMaterial color="#555555" transparent opacity={0.2} />
     </lineSegments>
   );
 }

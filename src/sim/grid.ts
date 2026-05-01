@@ -2,12 +2,12 @@
 // real-time performance while preserving the spec's per-cell semantics.
 import type { GridCell } from "./types";
 
-export const GRID_SIZE = 64; // 64x64 cells
+export const GRID_SIZE = 48; // 48x48 cells
 export const CELL_M = 2; // metres per cell
 export const WORLD_SIZE = GRID_SIZE * CELL_M; // 128m
 
-export const SLOPE_LIMIT = 0.6;
-export const MAX_PILE_HEIGHT = 8;
+export const SLOPE_LIMIT = 0.85;
+export const MAX_PILE_HEIGHT = 10.0;
 
 export function makeGrid(): GridCell[][] {
   const g: GridCell[][] = [];
@@ -18,15 +18,10 @@ export function makeGrid(): GridCell[][] {
       const cx = x - GRID_SIZE / 2;
       const cy = y - GRID_SIZE / 2;
       const r = Math.sqrt(cx * cx + cy * cy) / (GRID_SIZE / 2);
-      const base =
-        Math.sin(x * 0.18) * 0.4 +
-        Math.cos(y * 0.21) * 0.35 +
-        Math.sin((x + y) * 0.07) * 0.6 -
-        r * 0.4;
       row.push({
         x, y,
         occupied: false,
-        height: Math.max(0, base + 0.6),
+        height: 0,
         slope: 0,
         accessibility: true,
         reserved: false,

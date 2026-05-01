@@ -3,20 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import type { GridCell, Truck, Metrics, DumpEvent } from "@/sim/types";
 import {
-  GRID_SIZE, CELL_M, MAX_PILE_HEIGHT, makeGrid, gridToWorld, worldToGrid,
+  GRID_SIZE, CELL_M, MAX_PILE_HEIGHT, makeGrid, gridToWorld, worldToGrid, recomputeSlopesLocal,
 } from "@/sim/grid";
 import { astar } from "@/sim/pathfinding";
 import {
   pickDumpCell, reserveFootprint, clearExpiredReservations, applyDump,
 } from "@/sim/dumpEngine";
-import {
-  makeVoronoi, recomputeUtilization, reassignSaturatedZones, zoneForTruck,
-  type VoronoiState,
-} from "@/sim/voronoi";
 
-const TRUCK_COLORS = ["#f59e0b", "#fb923c", "#fbbf24", "#facc15", "#fdba74"];
+const TRUCK_COLORS = ["#fbb414", "#fcd34d", "#fbbf24", "#f59e0b", "#d97706"]; // CAT Industrial Yellow
+const MATERIALS: ("COAL" | "IRON_ORE" | "LIMESTONE" | "OVERBURDEN")[] = ["COAL", "IRON_ORE", "LIMESTONE", "OVERBURDEN", "IRON_ORE"];
 const ENTRY_POINTS: [number, number][] = [
-  [2, 2], [GRID_SIZE - 3, 2], [2, GRID_SIZE - 3], [GRID_SIZE - 3, GRID_SIZE - 3],
+  [2, 2], // Single entry/exit point for all trucks
 ];
 
 function makeTrucks(n: number): Truck[] {
@@ -34,6 +31,7 @@ function makeTrucks(n: number): Truck[] {
       load: 1,
       size: sizes[i % sizes.length],
       color: TRUCK_COLORS[i % TRUCK_COLORS.length],
+      material: MATERIALS[i % MATERIALS.length],
       path: [],
       pathIndex: 0,
       bedTilt: 0,
@@ -53,24 +51,36 @@ export interface SimState {
   metrics: Metrics;
   events: DumpEvent[];
   tick: number;
-  voronoi: VoronoiState;
-  reassignments: { id: number; zoneId: number; t: number }[];
 }
 
 const TRUCK_SPEED_MPS = 6; // metres/sec
 
-export function useSimulation(numTrucks = 5) {
+export function useSimulation(initialTrucks = 5) {
   const gridRef = useRef<GridCell[][]>(makeGrid());
-  const trucksRef = useRef<Truck[]>(makeTrucks(numTrucks));
+  const trucksRef = useRef<Truck[]>(makeTrucks(initialTrucks));
+  const [targetTruckCount, setTargetTruckCount] = useState(initialTrucks);
   const eventsRef = useRef<DumpEvent[]>([]);
   const eventIdRef = useRef(0);
   const cycleSamplesRef = useRef<number[]>([]);
   const dumpTimestampsRef = useRef<number[]>([]);
-  const voronoiRef = useRef<VoronoiState>(
-    makeVoronoi(numTrucks, trucksRef.current.map(t => t.id))
-  );
-  const reassignLogRef = useRef<{ id: number; zoneId: number; t: number }[]>([]);
-  const reassignIdRef = useRef(0);
+  const [simSpeed, setSimSpeedState] = useState(1);
+  const simSpeedRef = useRef(1);
+  
+  const [selectedMaterial, setSelectedMaterialState] = useState<string>("MIXED");
+  const selectedMaterialRef = useRef<string>("MIXED");
+  
+  const setSelectedMaterial = (m: string) => {
+    selectedMaterialRef.current = m;
+    setSelectedMaterialState(m);
+    trucksRef.current.forEach((t, idx) => {
+      t.material = m === "MIXED" ? MATERIALS[idx % MATERIALS.length] : (m as any);
+    });
+  };
+
+  const setSimSpeed = (speed: number) => {
+    simSpeedRef.current = speed;
+    setSimSpeedState(speed);
+  };
 
   const [state, setState] = useState<SimState>(() => ({
     grid: gridRef.current,
@@ -78,8 +88,6 @@ export function useSimulation(numTrucks = 5) {
     events: [],
     tick: 0,
     metrics: { totalDumps: 0, avgHeight: 0, utilization: 0, activeTrucks: 0, packingDensity: 0, throughput: 0, avgCycleMs: 0 },
-    voronoi: voronoiRef.current,
-    reassignments: [],
   }));
 
   const lastTimeRef = useRef(performance.now());
@@ -87,10 +95,32 @@ export function useSimulation(numTrucks = 5) {
   const runningRef = useRef(true);
 
   useEffect(() => {
+    const currentLen = trucksRef.current.length;
+    if (targetTruckCount > currentLen) {
+      const newTrucks = makeTrucks(targetTruckCount - currentLen);
+      // Fix IDs and properties based on existing count
+      newTrucks.forEach((t, i) => {
+        const idx = currentLen + i;
+        const entry = ENTRY_POINTS[idx % ENTRY_POINTS.length];
+        const [wx, wz] = gridToWorld(entry[0], entry[1]);
+        const sizes: ("S" | "M" | "L")[] = ["M", "L", "M", "S", "L"];
+        t.id = `T-${(idx + 1).toString().padStart(2, "0")}`;
+        t.position = [wx, 0, wz];
+        t.size = sizes[idx % sizes.length];
+        t.color = TRUCK_COLORS[idx % TRUCK_COLORS.length];
+        t.material = selectedMaterialRef.current === "MIXED" ? MATERIALS[idx % MATERIALS.length] : (selectedMaterialRef.current as any);
+      });
+      trucksRef.current.push(...newTrucks);
+    } else if (targetTruckCount < currentLen) {
+      trucksRef.current.splice(targetTruckCount);
+    }
+  }, [targetTruckCount]);
+
+  useEffect(() => {
     let raf = 0;
     const loop = () => {
       const now = performance.now();
-      const dt = Math.min(0.1, (now - lastTimeRef.current) / 1000);
+      const dt = Math.min(0.1, (now - lastTimeRef.current) / 1000) * simSpeedRef.current;
       lastTimeRef.current = now;
       if (runningRef.current) step(dt, now);
       tickRef.current++;
@@ -102,8 +132,6 @@ export function useSimulation(numTrucks = 5) {
           events: eventsRef.current.slice(-12),
           tick: tickRef.current,
           metrics: computeMetrics(now),
-          voronoi: voronoiRef.current,
-          reassignments: reassignLogRef.current.slice(-8),
         });
       }
       raf = requestAnimationFrame(loop);
@@ -150,16 +178,21 @@ export function useSimulation(numTrucks = 5) {
     const [tgx, tgy] = worldToGrid(truck.position[0], truck.position[2]);
 
     if (truck.state === "IDLE") {
-      // Plan: pick a dump cell within this truck's Voronoi zone
-      const v = voronoiRef.current;
-      const zone = zoneForTruck(v, truck.id);
-      const hint = zone
-        ? { assign: v.assign, preferredZone: zone.id, seed: zone.seed }
-        : undefined;
-      const target = pickDumpCell(grid, [tgx, tgy], now, hint);
+      // Plan: pick a dump cell
+      const entry = ENTRY_POINTS[0];
+      const target = pickDumpCell(grid, [tgx, tgy], now, entry);
       if (!target) return;
-      const path = astar(grid, [tgx, tgy], target);
+      
+      // We pathfind directly to the target, which pickDumpCell already guaranteed is reachable.
+      let path = astar(grid, [tgx, tgy], target);
       if (!path || path.length < 2) return;
+      
+      // Stop the truck a few steps before the exact target center 
+      // to avoid it driving completely up a forming peak
+      if (path.length > 3) {
+        path = path.slice(0, path.length - 2);
+      }
+      
       reserveFootprint(grid, target, truck.heading, truck.size, now, 12000);
       truck.target = target;
       truck.path = path;
@@ -209,6 +242,13 @@ export function useSimulation(numTrucks = 5) {
       truck.speed = 0;
       truck.state = "DUMPING";
       truck.dumpProgress = 0;
+      // Spin around to dump backwards!
+      if (truck.target) {
+        const [twx, twz] = gridToWorld(truck.target[0], truck.target[1]);
+        const dx = truck.position[0] - twx;
+        const dz = truck.position[2] - twz;
+        truck.heading = Math.atan2(dx, dz);
+      }
       return;
     }
 
@@ -218,7 +258,8 @@ export function useSimulation(numTrucks = 5) {
       truck.load = Math.max(0, 1 - truck.dumpProgress);
       if (truck.dumpProgress >= 1 && truck.target) {
         // Apply material
-        applyDump(grid, truck.target, 1.2);
+        applyDump(grid, truck.target, 1.2, truck.material);
+        recomputeSlopesLocal(grid, truck.target[0], truck.target[1], 5);
         truck.totalDumps++;
         eventIdRef.current++;
         eventsRef.current.push({
@@ -230,16 +271,8 @@ export function useSimulation(numTrucks = 5) {
         });
         dumpTimestampsRef.current.push(now);
 
-        // Update Voronoi utilization & relocate any saturated zones
-        recomputeUtilization(voronoiRef.current, grid);
-        const relocated = reassignSaturatedZones(voronoiRef.current, grid);
-        for (const zid of relocated) {
-          reassignIdRef.current++;
-          reassignLogRef.current.push({ id: reassignIdRef.current, zoneId: zid, t: now });
-        }
-
         // Plan return
-        const entry = ENTRY_POINTS[parseInt(truck.id.slice(2)) % ENTRY_POINTS.length];
+        const entry = ENTRY_POINTS[0];
         const [tgx2, tgy2] = worldToGrid(truck.position[0], truck.position[2]);
         const path = astar(grid, [tgx2, tgy2], entry, { ignoreReserved: true });
         truck.path = path && path.length > 1 ? path : [[tgx2, tgy2], entry];
@@ -252,7 +285,7 @@ export function useSimulation(numTrucks = 5) {
     }
   }
 
-  return { state, gridRef, trucksRef };
+  return { state, gridRef, trucksRef, targetTruckCount, setTargetTruckCount, simSpeed, setSimSpeed, selectedMaterial, setSelectedMaterial };
 }
 
 function terrainHeightAt(grid: GridCell[][], gx: number, gy: number) {

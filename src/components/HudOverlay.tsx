@@ -5,20 +5,27 @@ import type { Zone } from "@/sim/voronoi";
 import { REASSIGN_THRESHOLD } from "@/sim/voronoi";
 
 interface Props {
+  truckCount: number;
+  onTruckCountChange: (count: number) => void;
+  simSpeed: number;
+  onSimSpeedChange: (speed: number) => void;
   metrics: Metrics;
   trucks: Truck[];
   events: DumpEvent[];
   showHeatmap: boolean;
   onToggleHeatmap: () => void;
-  showZones: boolean;
-  onToggleZones: () => void;
-  zones: Zone[];
-  reassignments: { id: number; zoneId: number; t: number }[];
+  showEmptyGrid?: boolean;
+  onToggleEmptyGrid?: () => void;
   followTruck: string | null;
   onFollowTruck: (id: string | null) => void;
+  selectedMaterial: string;
+  onSelectedMaterialChange: (m: string) => void;
+  isNight: boolean;
+  onToggleNight: () => void;
+  gridRef?: React.MutableRefObject<any>;
 }
 
-export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatmap, showZones, onToggleZones, zones, reassignments, followTruck, onFollowTruck }: Props) {
+export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpeedChange, metrics, trucks, events, showHeatmap, onToggleHeatmap, showEmptyGrid, onToggleEmptyGrid, followTruck, onFollowTruck, selectedMaterial, onSelectedMaterialChange, isNight, onToggleNight, gridRef }: Props) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
       {/* Top bar */}
@@ -32,15 +39,61 @@ export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatm
             AUTONOMOUS DUMP YARD · DIGITAL TWIN v1.0
           </span>
         </div>
-        <div className="flex items-center gap-2 text-[10px]">
-          <button
-            onClick={onToggleZones}
-            className={`px-3 py-1.5 border tracking-widest transition ${
-              showZones ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            ZONES {showZones ? "ON" : "OFF"}
-          </button>
+        <div className="flex items-center gap-4 text-[10px]">
+          <div className="flex flex-col gap-1 mr-4">
+            <label className="text-muted-foreground tracking-widest flex justify-between">
+              <span>SIM SPEED:</span>
+              <span className="text-primary">{simSpeed}x</span>
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="10"
+              value={simSpeed}
+              onChange={(e) => onSimSpeedChange(parseInt(e.target.value))}
+              className="w-24 accent-primary cursor-pointer"
+            />
+          </div>
+          <div className="flex flex-col gap-1 mr-4">
+            <label className="text-muted-foreground tracking-widest flex justify-between">
+              <span>FLEET SIZE:</span>
+              <span className="text-primary">{truckCount}</span>
+            </label>
+            <input
+              type="range"
+              min="1"
+              max="15"
+              value={truckCount}
+              onChange={(e) => onTruckCountChange(parseInt(e.target.value))}
+              className="w-24 accent-primary cursor-pointer"
+            />
+          </div>
+          <div className="flex flex-col gap-1 mr-4">
+            <label className="text-muted-foreground tracking-widest flex justify-between">
+              <span>MATERIAL:</span>
+            </label>
+            <select
+              value={selectedMaterial}
+              onChange={(e) => onSelectedMaterialChange(e.target.value)}
+              className="bg-background border border-border text-primary text-[10px] tracking-widest outline-none py-1 px-2 cursor-pointer"
+            >
+              <option value="MIXED">MIXED</option>
+              <option value="COAL">COAL</option>
+              <option value="IRON_ORE">IRON ORE</option>
+              <option value="LIMESTONE">LIMESTONE</option>
+              <option value="OVERBURDEN">OVERBURDEN</option>
+            </select>
+          </div>
+          {onToggleEmptyGrid && (
+            <button
+              onClick={onToggleEmptyGrid}
+              className={`px-3 py-1.5 border tracking-widest transition ${
+                showEmptyGrid ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              DEBUG GRID {showEmptyGrid ? "ON" : "OFF"}
+            </button>
+          )}
           <button
             onClick={onToggleHeatmap}
             className={`px-3 py-1.5 border tracking-widest transition ${
@@ -48,6 +101,14 @@ export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatm
             }`}
           >
             HEATMAP {showHeatmap ? "ON" : "OFF"}
+          </button>
+          <button
+            onClick={onToggleNight}
+            className={`px-3 py-1.5 border tracking-widest transition ${
+              isNight ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            TIME: {isNight ? "NIGHT" : "DAY"}
           </button>
           <div className="px-3 py-1.5 border border-border text-muted-foreground tracking-widest">
             STATUS: <span className="text-primary">ONLINE</span>
@@ -59,7 +120,6 @@ export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatm
         {/* Left: Metrics + Charts */}
         <div className="pointer-events-auto flex flex-col gap-3 w-72 overflow-y-auto">
           <MetricsPanel metrics={metrics} />
-          <ZonesPanel zones={zones} reassignments={reassignments} />
           <ChartCard title="PACKING DENSITY" value={metrics.packingDensity} max={1} unit="%" series="density" tick={metrics.totalDumps} />
           <ChartCard title="THROUGHPUT (60s)" value={metrics.throughput} max={20} unit="dumps" series="throughput" tick={metrics.totalDumps} />
           <ChartCard title="AVG CYCLE TIME" value={metrics.avgCycleMs / 1000} max={60} unit="s" series="cycle" tick={metrics.totalDumps} />
@@ -81,8 +141,16 @@ export function HudOverlay({ metrics, trucks, events, showHeatmap, onToggleHeatm
         <span className="text-muted-foreground">·</span>
         <span>SLOPE LIMIT: 0.6</span>
         <span>·</span>
-        <span>GRID: 64×64 @ 2m</span>
+        <span>GRID: 48×48 @ 2m</span>
       </footer>
+
+      {/* Active Truck Telemetry Card */}
+      {followTruck && (
+        <>
+          <LidarRadar truck={trucks.find((t) => t.id === followTruck)} gridRef={gridRef} />
+          <LiveTelemetryCard truck={trucks.find((t) => t.id === followTruck)} />
+        </>
+      )}
     </div>
   );
 }
@@ -233,65 +301,170 @@ function EventLog({ events }: { events: DumpEvent[] }) {
   );
 }
 
-function ZonesPanel({ zones, reassignments }: { zones: Zone[]; reassignments: { id: number; zoneId: number; t: number }[] }) {
-  const totalReassign = zones.reduce((s, z) => s + z.reassignments, 0);
+function LiveTelemetryCard({ truck }: { truck?: Truck }) {
+  if (!truck) return null;
   return (
-    <div className="hud-panel p-4">
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-[10px] tracking-widest text-primary">// VORONOI ZONES</span>
-        <span className="text-[9px] text-muted-foreground tracking-widest">
-          REASSIGN: <span className="text-foreground tabular-nums">{totalReassign}</span>
-        </span>
-      </div>
-      <div className="flex flex-col gap-2">
-        {zones.map((z) => {
-          const pct = z.utilization * 100;
-          const saturated = z.utilization >= REASSIGN_THRESHOLD;
-          return (
-            <div key={z.id}>
-              <div className="flex items-center justify-between text-[10px] mb-0.5">
-                <div className="flex items-center gap-1.5">
-                  <span
-                    className="h-2 w-2 rounded-full"
-                    style={{ backgroundColor: z.color, boxShadow: `0 0 6px ${z.color}` }}
-                  />
-                  <span className="font-bold tracking-widest">Z{z.id}</span>
-                  <span className="text-muted-foreground">→ {z.truckId ?? "—"}</span>
-                </div>
-                <span
-                  className="tabular-nums tracking-widest"
-                  style={{ color: saturated ? "#ff5050" : z.color }}
-                >
-                  {pct.toFixed(0)}%
-                </span>
-              </div>
-              <div className="h-1 bg-secondary overflow-hidden relative">
-                <div
-                  className="h-full transition-all"
-                  style={{
-                    width: `${Math.min(100, pct)}%`,
-                    backgroundColor: z.color,
-                    boxShadow: saturated ? `0 0 8px ${z.color}` : "none",
-                  }}
-                />
-                {/* 85% threshold marker */}
-                <div
-                  className="absolute top-0 bottom-0 w-px bg-foreground/40"
-                  style={{ left: `${REASSIGN_THRESHOLD * 100}%` }}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      {reassignments.length > 0 && (
-        <div className="mt-3 pt-2 border-t border-border text-[9px] text-muted-foreground tracking-widest">
-          LAST RELOCATION: Z{reassignments[reassignments.length - 1].zoneId}
-          <span className="text-primary ml-1">
-            {((performance.now() - reassignments[reassignments.length - 1].t) / 1000).toFixed(0)}s ago
-          </span>
+    <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-[400px] hud-panel p-5 bg-[#0a0a0a]/95 backdrop-blur-md border border-primary/40 shadow-[0_0_30px_rgba(245,158,11,0.15)] pointer-events-auto transition-all">
+      <div className="flex items-center justify-between mb-4 border-b border-border pb-3">
+        <div className="flex items-center gap-3">
+          <div className="h-3 w-3 rounded-sm" style={{ backgroundColor: truck.color, boxShadow: `0 0 10px ${truck.color}` }} />
+          <h2 className="text-lg font-bold tracking-[0.2em] text-foreground">{truck.id} TELEMETRY</h2>
         </div>
-      )}
+        <div className="text-[10px] tracking-widest px-2 py-1 border border-primary text-primary bg-primary/10">
+          {truck.state}
+        </div>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+        <div className="flex flex-col gap-1">
+          <span className="text-[9px] text-muted-foreground tracking-widest">POSITION (XYZ)</span>
+          <span className="text-primary">{truck.position[0].toFixed(1)}, {truck.position[1].toFixed(1)}, {truck.position[2].toFixed(1)}</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-[9px] text-muted-foreground tracking-widest">PAYLOAD STATUS</span>
+          <span className="text-primary">{(truck.load * 100).toFixed(0)}% <span className="text-muted-foreground">[{truck.material}]</span></span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-[9px] text-muted-foreground tracking-widest">HEADING / TILT</span>
+          <span className="text-foreground">{truck.heading.toFixed(2)} rad / {truck.bedTilt.toFixed(2)}</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-[9px] text-muted-foreground tracking-widest">SPEED</span>
+          <span className="text-foreground">{truck.speed.toFixed(1)} m/s</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-[9px] text-muted-foreground tracking-widest">TARGET CELL</span>
+          <span className="text-accent">{truck.target ? `[${truck.target[0]}, ${truck.target[1]}]` : "AWAITING"}</span>
+        </div>
+        <div className="flex flex-col gap-1">
+          <span className="text-[9px] text-muted-foreground tracking-widest">CYCLE TIME</span>
+          <span className="text-foreground tabular-nums">{((performance.now() - truck.cycleStart) / 1000).toFixed(1)}s</span>
+        </div>
+      </div>
+      
+      <div className="mt-4 pt-3 border-t border-border">
+         <div className="text-[9px] text-muted-foreground tracking-widest mb-1 flex justify-between">
+           <span>A* PATHFINDING WAYPOINTS</span>
+           <span>{truck.path.length} NODES</span>
+         </div>
+         <div className="h-1.5 w-full bg-secondary">
+           <div className="h-full bg-primary transition-all duration-300" style={{ width: `${Math.min(100, (truck.path.length / 40) * 100)}%` }} />
+         </div>
+      </div>
+    </div>
+  );
+}
+
+function LidarRadar({ truck, gridRef }: { truck?: Truck, gridRef?: React.MutableRefObject<any> }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  
+  useEffect(() => {
+    if (!truck || !gridRef || !gridRef.current) return;
+    let raf = 0;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    
+    const loop = () => {
+      const w = canvas.width = canvas.offsetWidth * devicePixelRatio;
+      const h = canvas.height = canvas.offsetHeight * devicePixelRatio;
+      ctx.clearRect(0, 0, w, h);
+      
+      const cx = w / 2;
+      const cy = h / 2;
+      const radius = w / 2 - 10;
+      
+      // Radar rings
+      ctx.strokeStyle = "rgba(34, 211, 238, 0.2)";
+      ctx.lineWidth = 1 * devicePixelRatio;
+      for (let i = 1; i <= 3; i++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, (radius / 3) * i, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      
+      // Crosshairs
+      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, h); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(w, cy); ctx.stroke();
+
+      // Sweep line
+      const time = performance.now() / 1000;
+      const angle = (time * 3) % (Math.PI * 2);
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius);
+      ctx.strokeStyle = "rgba(34, 211, 238, 0.8)";
+      ctx.lineWidth = 2 * devicePixelRatio;
+      ctx.stroke();
+      
+      // Sweep gradient
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.arc(cx, cy, radius, angle - 0.8, angle);
+      ctx.closePath();
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+      grad.addColorStop(0, "rgba(34, 211, 238, 0.3)");
+      grad.addColorStop(1, "rgba(34, 211, 238, 0.0)");
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      // Obstacles
+      const grid = gridRef.current;
+      const truckX = truck.position[0];
+      const truckZ = truck.position[2];
+      const rangeM = 24; // 24 meters radius radar
+      
+      for (let y = 0; y < grid.length; y++) {
+        for (let x = 0; x < grid[0].length; x++) {
+           const cell = grid[y][x];
+           if (cell.height > 0.3) {
+              const cellWx = (x - 24) * 2 + 1;
+              const cellWz = (y - 24) * 2 + 1;
+              const dx = cellWx - truckX;
+              const dz = cellWz - truckZ;
+              const dist = Math.hypot(dx, dz);
+              if (dist < rangeM) {
+                 const mapX = cx + (dx / rangeM) * radius;
+                 const mapY = cy + (dz / rangeM) * radius;
+                 ctx.beginPath();
+                 ctx.arc(mapX, mapY, (1 + cell.height * 0.8) * devicePixelRatio, 0, Math.PI * 2);
+                 ctx.fillStyle = `rgba(239, 68, 68, ${0.4 + (cell.height / 3) * 0.6})`;
+                 ctx.fill();
+              }
+           }
+        }
+      }
+      
+      // Truck position and heading
+      ctx.fillStyle = "#facc15";
+      ctx.beginPath();
+      ctx.arc(cx, cy, 3 * devicePixelRatio, 0, Math.PI * 2);
+      ctx.fill();
+      
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      const hx = Math.sin(truck.heading);
+      const hz = Math.cos(truck.heading);
+      ctx.lineTo(cx + hx * 12 * devicePixelRatio, cy + hz * 12 * devicePixelRatio);
+      ctx.strokeStyle = "#facc15";
+      ctx.lineWidth = 2 * devicePixelRatio;
+      ctx.stroke();
+
+      raf = requestAnimationFrame(loop);
+    };
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
+  }, [truck, gridRef]);
+
+  if (!truck) return null;
+  return (
+    <div className="absolute bottom-16 left-6 w-56 h-56 hud-panel p-2 bg-[#0a0a0a]/95 backdrop-blur-md border border-primary/40 pointer-events-none overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.15)]">
+      <div className="text-[9px] text-primary tracking-widest mb-1 absolute top-3 left-3 z-10 flex items-center gap-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-primary animate-ping" />
+        LIDAR OBSTACLE DETECT
+      </div>
+      <canvas ref={canvasRef} className="w-full h-full rounded-full border border-primary/20 opacity-90 mt-2" />
     </div>
   );
 }

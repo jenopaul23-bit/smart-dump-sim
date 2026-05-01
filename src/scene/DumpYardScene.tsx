@@ -6,7 +6,6 @@ import * as THREE from "three";
 import { Terrain, GridOverlay } from "@/scene/Terrain";
 import { TruckMesh } from "@/scene/TruckMesh";
 import { PathLines, ReservationMarkers, DustParticles, V2XBeams } from "@/scene/Effects";
-import { VoronoiOverlay } from "@/scene/VoronoiOverlay";
 import { HudOverlay } from "@/components/HudOverlay";
 import { useSimulation } from "@/sim/useSimulation";
 import { WORLD_SIZE } from "@/sim/grid";
@@ -42,27 +41,28 @@ function CameraRig({ followId, trucks }: { followId: string | null; trucks: any[
 }
 
 export function DumpYardScene() {
-  const { state, gridRef } = useSimulation(5);
+  const { state, gridRef, targetTruckCount, setTargetTruckCount, simSpeed, setSimSpeed, selectedMaterial, setSelectedMaterial } = useSimulation(5);
   const [showHeatmap, setShowHeatmap] = useState(false);
-  const [showZones, setShowZones] = useState(true);
+  const [showEmptyGrid, setShowEmptyGrid] = useState(false);
   const [followTruck, setFollowTruck] = useState<string | null>(null);
+  const [isNight, setIsNight] = useState(false);
 
   return (
-    <div className="relative h-full w-full bg-background">
+    <div className={`relative h-full w-full ${isNight ? "bg-[#02040a]" : "bg-background"}`}>
       <Canvas
         shadows
         camera={{ position: [WORLD_SIZE * 0.55, WORLD_SIZE * 0.45, WORLD_SIZE * 0.55], fov: 38, near: 0.1, far: 1000 }}
         gl={{ antialias: true, powerPreference: "high-performance" }}
       >
-        <color attach="background" args={["#0a0d12"]} />
-        <fog attach="fog" args={["#0a0d12", 100, 350]} />
+        <color attach="background" args={[isNight ? "#02040a" : "#ffffff"]} />
+        <fog attach="fog" args={[isNight ? "#02040a" : "#ffffff", 100, 350]} />
 
         {/* Lighting */}
-        <ambientLight intensity={1.2} color="#fff0d8" />
+        <ambientLight intensity={isNight ? 0.15 : 1.2} color={isNight ? "#445566" : "#fff0d8"} />
         <directionalLight
           position={[80, 120, 60]}
-          intensity={2.0}
-          color="#ffd9a8"
+          intensity={isNight ? 0.3 : 2.0}
+          color={isNight ? "#aaccff" : "#ffd9a8"}
           castShadow
           shadow-mapSize={[2048, 2048]}
           shadow-camera-left={-WORLD_SIZE / 2}
@@ -72,18 +72,27 @@ export function DumpYardScene() {
           shadow-camera-near={1}
           shadow-camera-far={300}
         />
-        <directionalLight position={[-60, 40, -80]} intensity={0.6} color="#8aa8d0" />
-        <hemisphereLight args={["#c8a878", "#0a0610", 0.5]} />
+        <directionalLight position={[-60, 40, -80]} intensity={isNight ? 0.1 : 0.6} color={isNight ? "#334466" : "#8aa8d0"} />
+        <hemisphereLight args={["#c8a878", "#0a0610", isNight ? 0.1 : 0.5]} />
 
-        <Terrain gridRef={gridRef} showHeatmap={showHeatmap} />
+        {/* Night Mode Stadium Floodlights */}
+        {isNight && (
+          <group>
+            <pointLight position={[WORLD_SIZE / 2.5, 30, WORLD_SIZE / 2.5]} intensity={300} color="#ffeedd" distance={120} decay={1.5} />
+            <pointLight position={[-WORLD_SIZE / 2.5, 30, -WORLD_SIZE / 2.5]} intensity={300} color="#ffeedd" distance={120} decay={1.5} />
+            <pointLight position={[-WORLD_SIZE / 2.5, 30, WORLD_SIZE / 2.5]} intensity={300} color="#ffeedd" distance={120} decay={1.5} />
+            <pointLight position={[WORLD_SIZE / 2.5, 30, -WORLD_SIZE / 2.5]} intensity={300} color="#ffeedd" distance={120} decay={1.5} />
+          </group>
+        )}
+
+        <Terrain gridRef={gridRef} showHeatmap={showHeatmap} showEmptyGrid={showEmptyGrid} />
         <GridOverlay />
 
-        {state.trucks.map((t) => <TruckMesh key={t.id} truck={t} />)}
+        {state.trucks.map((t) => <TruckMesh key={t.id} truck={t} isNight={isNight} />)}
         <PathLines trucks={state.trucks} />
         <ReservationMarkers gridRef={gridRef} tick={state.tick} />
         <DustParticles trucks={state.trucks} />
         <V2XBeams trucks={state.trucks} tick={state.tick} />
-        <VoronoiOverlay voronoi={state.voronoi} visible={showZones} />
 
         {!followTruck && (
           <OrbitControls
@@ -100,17 +109,24 @@ export function DumpYardScene() {
       </Canvas>
 
       <HudOverlay
+        truckCount={targetTruckCount}
+        onTruckCountChange={setTargetTruckCount}
+        simSpeed={simSpeed}
+        onSimSpeedChange={setSimSpeed}
         metrics={state.metrics}
         trucks={state.trucks}
         events={state.events}
         showHeatmap={showHeatmap}
         onToggleHeatmap={() => setShowHeatmap((v) => !v)}
-        showZones={showZones}
-        onToggleZones={() => setShowZones((v) => !v)}
-        zones={state.voronoi.zones}
-        reassignments={state.reassignments}
+        showEmptyGrid={showEmptyGrid}
+        onToggleEmptyGrid={() => setShowEmptyGrid((v) => !v)}
         followTruck={followTruck}
         onFollowTruck={setFollowTruck}
+        selectedMaterial={selectedMaterial}
+        onSelectedMaterialChange={setSelectedMaterial}
+        isNight={isNight}
+        onToggleNight={() => setIsNight(v => !v)}
+        gridRef={gridRef}
       />
     </div>
   );
