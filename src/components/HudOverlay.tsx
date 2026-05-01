@@ -17,8 +17,8 @@ interface Props {
   onToggleHeatmap: () => void;
   showEmptyGrid?: boolean;
   onToggleEmptyGrid?: () => void;
-  cameraView: "ADMIN" | "TOP" | "SIDE" | "VEHICLE";
-  onCameraViewChange: (view: "ADMIN" | "TOP" | "SIDE" | "VEHICLE") => void;
+  cameraView: "ADMIN" | "TOP" | "SIDE" | "VEHICLE" | "FLEET";
+  onCameraViewChange: (view: "ADMIN" | "TOP" | "SIDE" | "VEHICLE" | "FLEET") => void;
   selectedMaterial: string;
   onSelectedMaterialChange: (m: string) => void;
   isNight: boolean;
@@ -109,6 +109,7 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
               <option className="bg-background" value="TOP">TOP</option>
               <option className="bg-background" value="SIDE">SIDE</option>
               <option className="bg-background" value="VEHICLE">VEHICLE</option>
+              <option className="bg-background" value="FLEET">FLEET MONITORS</option>
             </select>
           </div>
 
@@ -122,6 +123,14 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
               DEMO: {isDemoMode ? "1-TRUCK (4 DUMPS)" : "OFF"}
             </button>
           )}
+          <button
+            onClick={() => onCameraViewChange(cameraView === "FLEET" ? "ADMIN" : "FLEET")}
+            className={`px-3 py-1.5 border tracking-widest transition font-bold ${
+              cameraView === "FLEET" ? "bg-primary text-primary-foreground border-primary" : "border-primary/50 text-primary hover:bg-primary/10"
+            }`}
+          >
+            ADMIN DASHBOARD
+          </button>
           <button
             onClick={onToggleHeatmap}
             className={`px-3 py-1.5 border tracking-widest transition ${
@@ -144,24 +153,27 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
         </div>
       </header>
 
-      <div className="flex-1 flex justify-between p-4 gap-4 overflow-hidden">
-        {/* Left: Metrics + Charts */}
-        <div className="pointer-events-auto flex flex-col gap-3 w-72 overflow-y-auto">
-          <MetricsPanel metrics={metrics} />
-          <ChartCard title="PACKING DENSITY" value={metrics.packingDensity} max={1} unit="%" series="density" tick={metrics.totalDumps} />
-          <ChartCard title="THROUGHPUT (60s)" value={metrics.throughput} max={20} unit="dumps" series="throughput" tick={metrics.totalDumps} />
-          <ChartCard title="AVG CYCLE TIME" value={metrics.avgCycleMs / 1000} max={60} unit="s" series="cycle" tick={metrics.totalDumps} />
-        </div>
+      {cameraView !== "FLEET" && (
+        <>
+          <div className="flex-1 flex justify-between p-4 gap-4 overflow-hidden">
+            {/* Left: Metrics + Charts */}
+            <div className="pointer-events-auto flex flex-col gap-3 w-72 overflow-y-auto">
+              <MetricsPanel metrics={metrics} />
+              <ChartCard title="PACKING DENSITY" value={metrics.packingDensity} max={1} unit="%" series="density" tick={metrics.totalDumps} />
+              <ChartCard title="THROUGHPUT (60s)" value={metrics.throughput} max={20} unit="dumps" series="throughput" tick={metrics.totalDumps} />
+              <ChartCard title="AVG CYCLE TIME" value={metrics.avgCycleMs / 1000} max={60} unit="s" series="cycle" tick={metrics.totalDumps} />
+            </div>
 
-        {/* Right: Truck roster */}
-        <div className="pointer-events-auto flex flex-col gap-3 w-72">
-          <TruckRoster trucks={trucks} followTruck={cameraView === "VEHICLE" && trucks.length > 0 ? trucks[0].id : null} onFollow={() => onCameraViewChange("VEHICLE")} />
-          <EventLog events={events} />
-        </div>
-      </div>
+            {/* Right: Truck roster */}
+            <div className="pointer-events-auto flex flex-col gap-3 w-72">
+              <TruckRoster trucks={trucks} followTruck={cameraView === "VEHICLE" && trucks.length > 0 ? trucks[0].id : null} onFollow={() => onCameraViewChange("VEHICLE")} />
+              <EventLog events={events} />
+            </div>
+          </div>
 
-      {/* Bottom: Legend */}
-      <footer className="pointer-events-auto flex items-center justify-center gap-6 px-6 py-2 hud-panel border-t text-[10px] tracking-widest text-muted-foreground">
+          {/* Bottom: Legend */}
+          <footer className="pointer-events-auto flex items-center justify-center gap-6 px-6 py-2 hud-panel border-t text-[10px] tracking-widest text-muted-foreground">
+
         <Legend color="#22d3ee" label="MOVING" />
         <Legend color="#facc15" label="ARRIVED" />
         <Legend color="#f97316" label="DUMPING" />
@@ -171,6 +183,8 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
         <span>·</span>
         <span>GRID: 48×48 @ 2m</span>
       </footer>
+      </>
+      )}
 
       {/* Active Truck Telemetry Card */}
       {cameraView === "VEHICLE" && trucks.length > 0 && (

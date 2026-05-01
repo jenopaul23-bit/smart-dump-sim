@@ -7,10 +7,11 @@ import { Terrain, GridOverlay } from "@/scene/Terrain";
 import { TruckMesh } from "@/scene/TruckMesh";
 import { PathLines, ReservationMarkers, DustParticles, V2XBeams, RockRubble } from "@/scene/Effects";
 import { HudOverlay } from "@/components/HudOverlay";
+import { FleetMonitors } from "@/components/FleetMonitors";
 import { useSimulation } from "@/sim/useSimulation";
 import { WORLD_SIZE } from "@/sim/grid";
 
-export type CameraView = "ADMIN" | "TOP" | "SIDE" | "VEHICLE";
+export type CameraView = "ADMIN" | "TOP" | "SIDE" | "VEHICLE" | "FLEET";
 
 function CameraRig({ cameraView, trucks }: { cameraView: CameraView; trucks: any[] }) {
   const { camera } = useThree();
@@ -143,6 +144,10 @@ export function DumpYardScene() {
         isDemoMode={isDemoMode}
         onToggleDemoMode={() => setIsDemoMode(!isDemoMode)}
       />
+
+      {cameraView === "FLEET" && (
+        <FleetMonitors trucks={state.trucks} isNight={isNight} gridRef={gridRef} />
+      )}
     </div>
   );
 }
