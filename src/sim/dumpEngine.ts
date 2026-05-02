@@ -16,10 +16,9 @@ export function pickDumpCell(
   entryPoint: [number, number] = [2, 2],
   isDemoMode: boolean = false
 ): [number, number] | null {
-  // 1. Hexagonal/Staggered Grid: Enforcing exactly 3.03m gap between dumps
-  // Dump diameter is ~4m. 4m + 3.03m gap = 7.03m center-to-center.
-  // 7.03m / 2m per cell = 3.515 cells step.
-  const stepCells = (4.0 + 3.03) / 2.0;
+  // 1. Hexagonal/Staggered Grid: Enforcing exactly 3.5m gap between peaks
+  // 3.5m / 2m per cell = 1.75 cells step.
+  const stepCells = 3.5 / 2.0; 
   const rowStepCells = stepCells * 0.866; // Hexagonal row spacing (sin 60)
 
   // 1. Single BFS pass to find all reachable cells from the truck (O(N) = fast)
@@ -66,9 +65,8 @@ export function pickDumpCell(
       // Blocked if reserved
       if (c.reserved && c.reservedUntil > now) continue;
 
-      // 2. "The Low Spot" Problem Fix:
-      // 2. Do not target cells that already have a dump on them!
-      if (c.height > 0.5) continue;
+      // 2. "Only Dump Once" Constraint: Strictly enforce no re-dumping on same peak
+      if (c.hasDump) continue;
 
       // Safety check (must be flat enough)
       if (c.slope > SLOPE_LIMIT) continue;
@@ -76,13 +74,9 @@ export function pickDumpCell(
       // Must be reachable by the truck without driving over mountains
       if (!reachable.has(y * GRID_SIZE + x)) continue;
 
-      // 3. Multi-objective Scoring
+      // 3. Multi-objective Scoring: Strictly prioritize farthest-to-front
       const distFromEntry = Math.hypot(x - entryPoint[0], y - entryPoint[1]);
-      let score = distFromEntry * 5.0; // Back-to-front sweeping priority
-
-      // Minor penalty for being far from truck
-      const distFromTruck = Math.hypot(x - truckGrid[0], y - truckGrid[1]);
-      score -= distFromTruck * 0.8;
+      let score = distFromEntry * 10.0; // Strong back-to-front sweeping priority
 
       candidates.push({ x, y, score });
     }
@@ -142,6 +136,7 @@ export function applyDump(
   material: string = "OVERBURDEN"
 ): [number, number][] {
   const [cx, cy] = cell;
+  grid[cy][cx].hasDump = true;
 
   // Random jittering algorithm slightly mutates rx, ry, peak by up to 20%
   const jitterRx = 1 + (Math.random() * 0.4 - 0.2);
@@ -157,12 +152,12 @@ export function applyDump(
   else if (material === "LIMESTONE") { matFactor = 1.05; peakFactor = 1.05; }
   else { matFactor = 1.15; peakFactor = 0.9; }
 
-  // Tightly constrain the spread so it perfectly fits within the 4-grid column
-  const rx = v13 * 1.2 * jitterRx * matFactor;
-  const ry = v13 * 1.2 * jitterRy * matFactor;
+  // Constrain spread so dumps overlap into a continuous ridge (Windrow)
+  const rx = v13 * 1.0 * jitterRx * matFactor;
+  const ry = v13 * 1.0 * jitterRy * matFactor;
 
-  // Increase the peak height to visually account for the tighter spread
-  const peakAdd = v13 * 5.5 * jitterPeak * peakFactor;
+  // Set the peak height to target ~4.5m for clear visual ridges
+  const peakAdd = v13 * 4.5 * jitterPeak * peakFactor;
 
   // Strict radius of 2 ensures it NEVER touches the truck parked 3 cells away!
   const radius = 2;

@@ -4,6 +4,7 @@ import type { Metrics, Truck, DumpEvent } from "@/sim/types";
 import type { Zone } from "@/sim/voronoi";
 import { REASSIGN_THRESHOLD } from "@/sim/voronoi";
 import { DemoAvatar } from "./DemoAvatar";
+import type { MeasurementState } from "@/hooks/useMeasurementStore";
 
 interface Props {
   truckCount: number;
@@ -26,9 +27,16 @@ interface Props {
   gridRef?: React.MutableRefObject<any>;
   isDemoMode?: boolean;
   onToggleDemoMode?: () => void;
+  measurement?: {
+    state: MeasurementState;
+    startSelection: () => void;
+    analyse: () => void;
+    reset: () => void;
+    clearHistory: () => void;
+  };
 }
 
-export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpeedChange, metrics, trucks, events, showHeatmap, onToggleHeatmap, showEmptyGrid, onToggleEmptyGrid, cameraView, onCameraViewChange, selectedMaterial, onSelectedMaterialChange, isNight, onToggleNight, gridRef, isDemoMode, onToggleDemoMode }: Props) {
+export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpeedChange, metrics, trucks, events, showHeatmap, onToggleHeatmap, showEmptyGrid, onToggleEmptyGrid, cameraView, onCameraViewChange, selectedMaterial, onSelectedMaterialChange, isNight, onToggleNight, gridRef, isDemoMode, onToggleDemoMode, measurement }: Props) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
       {/* Top bar */}
@@ -147,6 +155,16 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
           >
             TIME: {isNight ? "NIGHT" : "DAY"}
           </button>
+          {measurement && (
+            <button
+              onClick={() => measurement.state.step === "idle" ? measurement.startSelection() : measurement.reset()}
+              className={`px-3 py-1.5 border tracking-widest transition ${
+                measurement.state.step !== "idle" ? "bg-accent text-accent-foreground border-accent" : "border-border text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              MEASURE {measurement.state.step !== "idle" ? "ON" : "OFF"}
+            </button>
+          )}
           <div className="px-3 py-1.5 border border-border text-muted-foreground tracking-widest">
             STATUS: <span className="text-primary">ONLINE</span>
           </div>
@@ -196,6 +214,48 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
 
       {/* Demo Mode Avatar Guide */}
       <DemoAvatar trucks={trucks} isDemoMode={!!isDemoMode} />
+
+      {/* Measurement Status Overlay */}
+      {measurement && measurement.state.step !== "idle" && (
+        <div className="pointer-events-auto absolute bottom-24 left-1/2 -translate-x-1/2 flex flex-col items-center gap-3">
+          <div className="hud-panel p-4 flex flex-col items-center gap-2 border-accent/50 bg-background/80 backdrop-blur-md">
+            <div className="text-[10px] tracking-[0.2em] text-accent font-bold uppercase">
+              {measurement.state.step === "selectingA" && "Select Point A (Click on Terrain)"}
+              {measurement.state.step === "selectingB" && "Select Point B (Click on Terrain)"}
+              {measurement.state.step === "ready" && "Points Ready"}
+            </div>
+            <div className="flex gap-4">
+              <div className={`flex flex-col items-center p-2 border ${measurement.state.pointA ? "border-primary bg-primary/10" : "border-border opacity-50"}`}>
+                <span className="text-[8px] text-muted-foreground uppercase">Point A</span>
+                <span className="text-[10px] font-mono">{measurement.state.pointA ? `${measurement.state.pointA.x.toFixed(1)}, ${measurement.state.pointA.z.toFixed(1)}` : "---"}</span>
+              </div>
+              <div className={`flex flex-col items-center p-2 border ${measurement.state.pointB ? "border-primary bg-primary/10" : "border-border opacity-50"}`}>
+                <span className="text-[8px] text-muted-foreground uppercase">Point B</span>
+                <span className="text-[10px] font-mono">{measurement.state.pointB ? `${measurement.state.pointB.x.toFixed(1)}, ${measurement.state.pointB.z.toFixed(1)}` : "---"}</span>
+              </div>
+            </div>
+            {measurement.state.step === "ready" && (
+              <button
+                onClick={measurement.analyse}
+                className="w-full mt-2 bg-accent text-accent-foreground px-4 py-2 text-[10px] font-bold tracking-widest hover:bg-accent/80 transition"
+              >
+                COMPUTE DISTANCE
+              </button>
+            )}
+            {measurement.state.result && (
+              <div className="mt-2 text-xl font-bold text-accent hud-glow">
+                {measurement.state.result.distance.toFixed(2)}m
+              </div>
+            )}
+            <button
+              onClick={measurement.reset}
+              className="mt-2 text-[8px] text-muted-foreground hover:text-foreground uppercase tracking-widest"
+            >
+              Cancel / Reset
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,7 @@ interface Props {
   gridRef: React.MutableRefObject<GridCell[][]>;
   showHeatmap: boolean;
   showEmptyGrid?: boolean;
+  onClick?: (event: any) => void;
 }
 
 const SEG = GRID_SIZE; // one vertex per cell corner
@@ -29,7 +30,7 @@ const H_LOW = new THREE.Color("#1f7a3a");
 const H_MID = new THREE.Color("#e0b020");
 const H_HIGH = new THREE.Color("#c0392b");
 
-export function Terrain({ gridRef, showHeatmap, showEmptyGrid }: Props) {
+export function Terrain({ gridRef, showHeatmap, showEmptyGrid, onClick }: Props) {
   const meshRef = useRef<THREE.Mesh>(null);
   const currentHeights = useRef<Float32Array>(new Float32Array(SEG * SEG));
 
@@ -116,7 +117,7 @@ export function Terrain({ gridRef, showHeatmap, showEmptyGrid }: Props) {
   });
 
   return (
-    <mesh ref={meshRef} geometry={geom} receiveShadow castShadow>
+    <mesh ref={meshRef} geometry={geom} receiveShadow castShadow onClick={onClick}>
       <meshPhysicalMaterial 
         vertexColors 
         roughness={1.0} 

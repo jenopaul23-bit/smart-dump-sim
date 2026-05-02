@@ -11,6 +11,7 @@ export interface GridCell {
   reserved: boolean;
   reservedUntil: number; // ms timestamp
   material?: MaterialType;
+  hasDump?: boolean;
 }
 
 export type TruckState = "MOVING" | "ARRIVED" | "DUMPING" | "RETURNING" | "IDLE";

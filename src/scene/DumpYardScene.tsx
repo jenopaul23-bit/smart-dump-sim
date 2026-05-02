@@ -10,6 +10,10 @@ import { HudOverlay } from "@/components/HudOverlay";
 import { FleetMonitors } from "@/components/FleetMonitors";
 import { useSimulation } from "@/sim/useSimulation";
 import { WORLD_SIZE } from "@/sim/grid";
+import { useMeasurementStore } from "@/hooks/useMeasurementStore";
+import { MeasurementMarker } from "@/components/MeasurementMarker";
+import { MeasurementLine } from "@/components/MeasurementLine";
+import { euclideanDistance } from "@/lib/distanceMeasurement";
 
 export type CameraView = "ADMIN" | "TOP" | "SIDE" | "VEHICLE" | "FLEET";
 
@@ -59,6 +63,28 @@ export function DumpYardScene() {
   const [cameraView, setCameraView] = useState<CameraView>("ADMIN");
   const [isNight, setIsNight] = useState(false);
 
+  // Measurement State
+  const {
+    state: mState,
+    startSelection,
+    setPointA,
+    setPointB,
+    analyse,
+    reset: resetMeasurement,
+    clearHistory,
+  } = useMeasurementStore();
+
+  const isMeasuring = mState.step !== "idle";
+  const liveDistance = mState.pointA && mState.pointB ? euclideanDistance(mState.pointA, mState.pointB) : null;
+
+  const handleCanvasClick = (e: any) => {
+    if (!isMeasuring) return;
+    e.stopPropagation();
+    const pt = { x: e.point.x, y: e.point.y, z: e.point.z };
+    if (mState.step === "selectingA") setPointA(pt);
+    else if (mState.step === "selectingB") setPointB(pt);
+  };
+
   return (
     <div className={`relative h-full w-full ${isNight ? "bg-[#02040a]" : "bg-background"}`}>
       <Canvas
@@ -98,15 +124,31 @@ export function DumpYardScene() {
           </group>
         )}
 
-        <Terrain gridRef={gridRef} showHeatmap={showHeatmap} showEmptyGrid={showEmptyGrid} />
+        <Terrain 
+          gridRef={gridRef} 
+          showHeatmap={showHeatmap} 
+          showEmptyGrid={showEmptyGrid} 
+          onClick={handleCanvasClick}
+        />
         <GridOverlay />
 
-        {state.trucks.map((t) => <TruckMesh key={t.id} truck={t} isNight={isNight} />)}
+        {/* Measurement Visuals */}
+        {mState.pointA && (
+          <MeasurementMarker position={mState.pointA} color="#00e5ff" label="A" />
+        )}
+        {mState.pointB && (
+          <MeasurementMarker position={mState.pointB} color="#ff9f43" label="B" />
+        )}
+        {mState.pointA && mState.pointB && liveDistance !== null && (
+          <MeasurementLine pointA={mState.pointA} pointB={mState.pointB} distance={liveDistance} />
+        )}
+
+        {state.trucks.map((t) => <TruckMesh key={t.id} truck={t} isNight={isNight} onClick={handleCanvasClick} />)}
         <PathLines trucks={state.trucks} />
         <ReservationMarkers gridRef={gridRef} tick={state.tick} />
         <DustParticles trucks={state.trucks} />
         <V2XBeams trucks={state.trucks} tick={state.tick} />
-        <RockRubble gridRef={gridRef} isDemoMode={isDemoMode} />
+        <RockRubble gridRef={gridRef} isDemoMode={isDemoMode} onClick={handleCanvasClick} />
 
         {!isDemoMode && cameraView === "ADMIN" && (
           <OrbitControls
@@ -143,6 +185,13 @@ export function DumpYardScene() {
         gridRef={gridRef}
         isDemoMode={isDemoMode}
         onToggleDemoMode={() => setIsDemoMode(!isDemoMode)}
+        measurement={{
+          state: mState,
+          startSelection,
+          analyse,
+          reset: resetMeasurement,
+          clearHistory,
+        }}
       />
 
       {cameraView === "FLEET" && (

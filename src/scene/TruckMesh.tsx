@@ -6,11 +6,11 @@ import * as THREE from "three";
 import { Text } from "@react-three/drei";
 import type { Truck } from "@/sim/types";
 
-interface Props { truck: Truck; isNight?: boolean }
+interface Props { truck: Truck; isNight?: boolean; onClick?: (event: any) => void; }
 
 const SIZE_SCALE = { S: 0.85, M: 1, L: 1.2 } as const;
 
-export function TruckMesh({ truck, isNight }: Props) {
+export function TruckMesh({ truck, isNight, onClick }: Props) {
   const root = useRef<THREE.Group>(null);
   const bed = useRef<THREE.Group>(null);
   const wheels = useRef<THREE.Mesh[]>([]);
@@ -33,7 +33,7 @@ export function TruckMesh({ truck, isNight }: Props) {
   const yellow = "#fcd34d";
 
   return (
-    <group ref={root}>
+    <group ref={root} onClick={onClick}>
       <group scale={[s, s, s]}>
         {/* Chassis / Frame */}
         <mesh position={[0, 0.6, 0]} castShadow>

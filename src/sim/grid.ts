@@ -26,6 +26,7 @@ export function makeGrid(): GridCell[][] {
         accessibility: true,
         reserved: false,
         reservedUntil: 0,
+        hasDump: false,
       });
     }
     g.push(row);

@@ -7,7 +7,7 @@ import type { Truck, GridCell } from "@/sim/types";
 import { GRID_SIZE, gridToWorld, MAX_PILE_HEIGHT } from "@/sim/grid";
 
 // Dynamic instanced rubble rendering for extreme realism in Demo Mode
-export function RockRubble({ gridRef, isDemoMode }: { gridRef: React.MutableRefObject<GridCell[][]>; isDemoMode: boolean }) {
+export function RockRubble({ gridRef, isDemoMode, onClick }: { gridRef: React.MutableRefObject<GridCell[][]>; isDemoMode: boolean; onClick?: (event: any) => void }) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const COUNT = 1500; // number of rocks
   
@@ -58,7 +58,7 @@ export function RockRubble({ gridRef, isDemoMode }: { gridRef: React.MutableRefO
   if (!isDemoMode) return null;
 
   return (
-    <instancedMesh ref={meshRef} args={[undefined, undefined, COUNT]} castShadow receiveShadow>
+    <instancedMesh ref={meshRef} args={[undefined, undefined, COUNT]} castShadow receiveShadow onClick={onClick}>
       <dodecahedronGeometry args={[1, 0]} />
       <meshPhysicalMaterial color="#5c2616" roughness={1.0} metalness={0.1} flatShading={true} />
     </instancedMesh>
