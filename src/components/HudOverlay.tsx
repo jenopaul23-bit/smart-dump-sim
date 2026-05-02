@@ -22,6 +22,8 @@ interface Props {
   onCameraViewChange: (view: "ADMIN" | "TOP" | "SIDE" | "VEHICLE" | "FLEET") => void;
   selectedMaterial: string;
   onSelectedMaterialChange: (m: string) => void;
+  packingStrategy: "LEGACY" | "WINDROW";
+  onPackingStrategyChange: (s: "LEGACY" | "WINDROW") => void;
   isNight: boolean;
   onToggleNight: () => void;
   gridRef?: React.MutableRefObject<any>;
@@ -36,7 +38,7 @@ interface Props {
   };
 }
 
-export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpeedChange, metrics, trucks, events, showHeatmap, onToggleHeatmap, showEmptyGrid, onToggleEmptyGrid, cameraView, onCameraViewChange, selectedMaterial, onSelectedMaterialChange, isNight, onToggleNight, gridRef, isDemoMode, onToggleDemoMode, measurement }: Props) {
+export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpeedChange, metrics, trucks, events, showHeatmap, onToggleHeatmap, showEmptyGrid, onToggleEmptyGrid, cameraView, onCameraViewChange, selectedMaterial, onSelectedMaterialChange, isNight, onToggleNight, gridRef, isDemoMode, onToggleDemoMode }: Props) {
   return (
     <div className="pointer-events-none absolute inset-0 z-10 flex flex-col">
       {/* Top bar */}
@@ -131,6 +133,14 @@ export function HudOverlay({ truckCount, onTruckCountChange, simSpeed, onSimSpee
               DEMO: {isDemoMode ? "1-TRUCK (4 DUMPS)" : "OFF"}
             </button>
           )}
+          <button
+            onClick={() => onPackingStrategyChange(packingStrategy === "LEGACY" ? "WINDROW" : "LEGACY")}
+            className={`px-3 py-1.5 border tracking-widest transition font-bold ${
+              packingStrategy === "WINDROW" ? "bg-green-600 text-white border-green-500" : "bg-red-900/50 text-red-400 border-red-500/50"
+            }`}
+          >
+            STRATEGY: {packingStrategy} {packingStrategy === "LEGACY" ? "(8m)" : "(3m)"}
+          </button>
           <button
             onClick={() => onCameraViewChange(cameraView === "FLEET" ? "ADMIN" : "FLEET")}
             className={`px-3 py-1.5 border tracking-widest transition font-bold ${

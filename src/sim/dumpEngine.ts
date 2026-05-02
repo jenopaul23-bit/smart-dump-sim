@@ -14,11 +14,13 @@ export function pickDumpCell(
   truckGrid: [number, number],
   now: number,
   entryPoint: [number, number] = [2, 2],
-  isDemoMode: boolean = false
+  isDemoMode: boolean = false,
+  strategy: "LEGACY" | "WINDROW" = "LEGACY"
 ): [number, number] | null {
-  // 1. Hexagonal/Staggered Grid: Enforcing exactly 3.5m gap between peaks
-  // 3.5m / 2m per cell = 1.75 cells step.
-  const stepCells = 3.5 / 2.0; 
+  // 1. Hexagonal/Staggered Grid: Enforcing exactly 3.03m gap between dumps
+  // Dump diameter is ~4m. 4m + 3.03m gap = 7.03m center-to-center.
+  // 7.03m / 2m per cell = 3.515 cells step.
+  const stepCells = (4.0 + 3.03) / 2.0;
   const rowStepCells = stepCells * 0.866; // Hexagonal row spacing (sin 60)
 
   // 1. Single BFS pass to find all reachable cells from the truck (O(N) = fast)
@@ -49,36 +51,98 @@ export function pickDumpCell(
   const maxY = isDemoMode ? 18 : GRID_SIZE - 4;
   const minY = isDemoMode ? 8 : 4;
 
-  for (let yF = maxY; yF >= minY; yF -= rowStepCells) {
-    // Offset every other row to create a honeycomb pattern
-    const rowIdx = Math.round((maxY - yF) / rowStepCells);
-    const rowOffset = (rowIdx % 2 === 0) ? 0 : (stepCells / 2);
+  if (strategy === "LEGACY") {
+    // 1. Hexagonal/Staggered Grid: Enforcing exactly 3.03m gap between dumps
+    // Dump diameter is ~4m. 4m + 3.03m gap = 7.03m center-to-center.
+    // 7.03m / 2m per cell = 3.515 cells step.
+    const stepCells = (4.0 + 3.03) / 2.0;
+    const rowStepCells = stepCells * 0.866; // Hexagonal row spacing (sin 60)
 
-    for (let xF = maxX - rowOffset; xF >= minX; xF -= stepCells) {
-      const x = Math.round(xF);
-      const y = Math.round(yF);
-      
-      if (x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) continue;
+    for (let yF = maxY; yF >= minY; yF -= rowStepCells) {
+      // Offset every other row to create a honeycomb pattern
+      const rowIdx = Math.round((maxY - yF) / rowStepCells);
+      const rowOffset = (rowIdx % 2 === 0) ? 0 : (stepCells / 2);
 
-      const c = grid[y][x];
+      for (let xF = maxX - rowOffset; xF >= minX; xF -= stepCells) {
+        const x = Math.round(xF);
+        const y = Math.round(yF);
+        
+        if (x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) continue;
 
-      // Blocked if reserved
-      if (c.reserved && c.reservedUntil > now) continue;
+        const c = grid[y][x];
 
-      // 2. "Only Dump Once" Constraint: Strictly enforce no re-dumping on same peak
-      if (c.hasDump) continue;
+        // Blocked if reserved
+        if (c.reserved && c.reservedUntil > now) continue;
 
-      // Safety check (must be flat enough)
-      if (c.slope > SLOPE_LIMIT) continue;
+      // 2. "The Low Spot" Problem Fix:
+      // 2. Do not target cells that already have a dump on them!
+      if (c.height > 0.5) continue;
 
-      // Must be reachable by the truck without driving over mountains
-      if (!reachable.has(y * GRID_SIZE + x)) continue;
+        // Safety check (must be flat enough)
+        if (c.slope > SLOPE_LIMIT) continue;
 
-      // 3. Multi-objective Scoring: Strictly prioritize farthest-to-front
+        // Must be reachable by the truck
+        if (!reachable.has(y * GRID_SIZE + x)) continue;
+
+      // 3. Multi-objective Scoring
       const distFromEntry = Math.hypot(x - entryPoint[0], y - entryPoint[1]);
-      let score = distFromEntry * 10.0; // Strong back-to-front sweeping priority
+      let score = distFromEntry * 5.0; // Back-to-front sweeping priority
 
-      candidates.push({ x, y, score });
+      // Minor penalty for being far from truck
+      const distFromTruck = Math.hypot(x - truckGrid[0], y - truckGrid[1]);
+      score -= distFromTruck * 0.8;
+
+        candidates.push({ x, y, score });
+      }
+    }
+  } else {
+    // WINDROW STRATEGY
+    // Row spacing: 8m (4 cells) to allow a wide, safe driving lane
+    // Along-row spacing: 3m (1.5 cells) for dense overlapping peaks
+    const rowSpacing = 4.0; // cells
+    const cellSpacing = 1.5; // cells
+
+    for (let yF = maxY; yF >= minY; yF -= rowSpacing) {
+      for (let xF = maxX; xF >= minX; xF -= cellSpacing) {
+        const x = Math.round(xF);
+        const y = Math.round(yF);
+
+        if (x < 0 || y < 0 || x >= GRID_SIZE || y >= GRID_SIZE) continue;
+
+        const c = grid[y][x];
+
+        if (c.reserved && c.reservedUntil > now) continue;
+        
+        // In windrow mode, we are explicitly allowing overlapping piles!
+        // But we shouldn't dump exactly on top of a very tall existing peak.
+        if (c.height > 1.5) continue;
+        
+        if (c.slope > SLOPE_LIMIT) continue;
+        if (!reachable.has(y * GRID_SIZE + x)) continue;
+
+        const distFromEntry = Math.hypot(x - entryPoint[0], y - entryPoint[1]);
+        let score = distFromEntry * 5.0;
+
+        // WINDROW ATTRACTION: If there's an existing pile adjacent to this cell ALONG THE SAME ROW,
+        // dramatically increase the score so the truck "continues the line".
+        let windrowBonus = 0;
+        for (let dx = -3; dx <= 3; dx++) {
+           if (dx === 0) continue;
+           const checkX = x + dx;
+           if (checkX >= 0 && checkX < GRID_SIZE) {
+             if (grid[y][checkX].height > 0.5) {
+                // Closer to an existing pile = much higher bonus
+                windrowBonus += (10 - Math.abs(dx)) * 30; 
+             }
+           }
+        }
+        score += windrowBonus;
+
+        const distFromTruck = Math.hypot(x - truckGrid[0], y - truckGrid[1]);
+        score -= distFromTruck * 0.8;
+
+        candidates.push({ x, y, score });
+      }
     }
   }
 

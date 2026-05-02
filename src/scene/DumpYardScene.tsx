@@ -57,7 +57,7 @@ function CameraRig({ cameraView, trucks }: { cameraView: CameraView; trucks: any
 }
 
 export function DumpYardScene() {
-  const { state, gridRef, targetTruckCount, setTargetTruckCount, simSpeed, setSimSpeed, selectedMaterial, setSelectedMaterial, isDemoMode, setIsDemoMode } = useSimulation(5);
+  const { state, gridRef, targetTruckCount, setTargetTruckCount, simSpeed, setSimSpeed, selectedMaterial, setSelectedMaterial, packingStrategy, setPackingStrategy, isDemoMode, setIsDemoMode } = useSimulation(5);
   const [showHeatmap, setShowHeatmap] = useState(false);
   const [showEmptyGrid, setShowEmptyGrid] = useState(false);
   const [cameraView, setCameraView] = useState<CameraView>("ADMIN");
@@ -180,6 +180,8 @@ export function DumpYardScene() {
         onCameraViewChange={setCameraView}
         selectedMaterial={selectedMaterial}
         onSelectedMaterialChange={setSelectedMaterial}
+        packingStrategy={packingStrategy}
+        onPackingStrategyChange={setPackingStrategy}
         isNight={isNight}
         onToggleNight={() => setIsNight(!isNight)}
         gridRef={gridRef}

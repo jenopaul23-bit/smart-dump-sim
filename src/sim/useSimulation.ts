@@ -61,6 +61,8 @@ export interface SimState {
 
 const TRUCK_SPEED_MPS = 6; // metres/sec
 
+export type PackingStrategy = "LEGACY" | "WINDROW";
+
 export function useSimulation(initialTrucks = 5) {
   const gridRef = useRef<GridCell[][]>(makeGrid());
   const trucksRef = useRef<Truck[]>(makeTrucks(initialTrucks));
@@ -83,6 +85,13 @@ export function useSimulation(initialTrucks = 5) {
     trucksRef.current.forEach((t, idx) => {
       t.material = m === "MIXED" ? MATERIALS[idx % MATERIALS.length] : (m as any);
     });
+  };
+
+  const [packingStrategy, setPackingStrategyState] = useState<PackingStrategy>("LEGACY");
+  const packingStrategyRef = useRef<PackingStrategy>("LEGACY");
+  const setPackingStrategy = (s: PackingStrategy) => {
+    packingStrategyRef.current = s;
+    setPackingStrategyState(s);
   };
 
   const setSimSpeed = (speed: number) => {
@@ -211,7 +220,7 @@ export function useSimulation(initialTrucks = 5) {
       
       // Plan: pick a dump cell
       const entry = ENTRY_POINTS[0];
-      const target = pickDumpCell(grid, [tgx, tgy], now, entry, isDemoModeRef.current);
+      const target = pickDumpCell(grid, [tgx, tgy], now, entry, isDemoModeRef.current, packingStrategyRef.current);
       if (!target) return;
 
       // We pathfind directly to the target, which pickDumpCell already guaranteed is reachable.
@@ -326,6 +335,8 @@ export function useSimulation(initialTrucks = 5) {
     setSimSpeed, 
     selectedMaterial, 
     setSelectedMaterial,
+    packingStrategy,
+    setPackingStrategy,
     isDemoMode,
     setIsDemoMode,
   };
